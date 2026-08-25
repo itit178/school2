@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang='ja'>
+<head>
+<meta charset='UTF-8'>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>学校デモ 4択クイズ＆花丸スタンプラリー版</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body { margin:0; overflow:hidden; background:#1e293b; touch-action:none; user-select:none; -webkit-user-select:none; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+#map { position:absolute; top:12px; left:12px; width:140px; height:140px; background:#000; border:2px solid #94a3b8; border-radius:12px; z-index:10; box-shadow:0 4px 10px rgba(0,0,0,0.3); }
+
+/* ヘッダー情報 */
+#info { position:absolute; top:12px; left:164px; color:#333; background:rgba(255,255,255,0.95); padding:10px 14px; border-radius:12px; line-height:1.4; box-shadow:0 4px 12px rgba(0,0,0,0.25); max-width:280px; z-index:10; font-size:12px; backdrop-filter:blur(6px); }
+#info h3 { margin:0 0 4px 0; font-size:14px; font-weight:bold; color:#1e3a8a; border-bottom:2px solid #3b82f6; padding-bottom:2px; }
+
+/* スタンプカード確認ボタン */
+#stamp-hud-btn { position:absolute; top:12px; right:12px; background:linear-gradient(135deg, #f59e0b, #d97706); color:#fff; font-weight:bold; padding:10px 18px; border-radius:24px; box-shadow:0 4px 15px rgba(217,119,6,0.4); cursor:pointer; z-index:20; border:2px solid #fef08a; display:flex; align-items:center; gap:8px; transition:transform 0.2s, background 0.2s; }
+#stamp-hud-btn:hover { transform:scale(1.05); }
+
+/* クイズUI (4択) */
+#quiz-overlay { position:absolute; bottom:10%; left:50%; transform:translateX(-50%); background:rgba(15, 23, 42, 0.95); color:#fff; padding:20px; border-radius:20px; border:2px solid #38bdf8; text-align:center; display:none; box-shadow:0 10px 30px rgba(0,0,0,0.6); z-index:100; width:90%; max-width:480px; backdrop-filter:blur(8px); }
+#quiz-options { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:16px; }
+.quiz-opt-btn { background:#1e293b; color:#f8fafc; border:2px solid #475569; padding:12px 10px; font-size:15px; font-weight:bold; border-radius:12px; cursor:pointer; transition:all 0.15s ease-in-out; text-align:center; }
+.quiz-opt-btn:hover { background:#3b82f6; border-color:#93c5fd; transform:translateY(-2px); }
+.quiz-opt-btn:active { transform:scale(0.96); }
+
+/* 花丸スタンプ・結果アニメーション */
+#stamp-modal { position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:#fffef0; color:#1e293b; padding:24px; border-radius:24px; border:4px solid #f59e0b; box-shadow:0 12px 40px rgba(0,0,0,0.7); z-index:250; display:none; width:90%; max-width:440px; text-align:center; }
+.stamp-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin:16px 0; }
+.stamp-slot { width:100%; aspect-ratio:1; background:#fef3c7; border:2px dashed #d97706; border-radius:14px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:11px; color:#b45309; font-weight:bold; position:relative; }
+.stamp-mark { font-size:36px; color:#dc2626; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%) scale(0.1) rotate(-15deg); opacity:0; transition:all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); text-shadow:0 2px 6px rgba(220,38,38,0.3); }
+.stamp-mark.stamped { transform:translate(-50%, -50%) scale(1) rotate(-10deg); opacity:1; }
+
+/* 博士雑学UI */
+#hakase-overlay { position:absolute; top:15%; left:50%; transform:translateX(-50%); background:rgba(20,30,48,0.95); color:#fff; padding:20px; border-radius:16px; border:2px solid #f1c40f; text-align:center; display:none; box-shadow:0 4px 20px rgba(0,0,0,0.6); z-index:150; width:85%; max-width:420px; backdrop-filter:blur(6px); }
+#hakase-overlay button { margin-top:15px; padding:10px 24px; background:#f1c40f; color:#111; border:none; border-radius:10px; font-weight:bold; font-size:16px; cursor:pointer; }
+
+/* 初回ガイダンスUI */
+#guidance-overlay { position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(15, 23, 42, 0.96); color:#fff; padding:24px; border-radius:20px; border:3px solid #38bdf8; text-align:center; box-shadow:0 10px 35px rgba(0,0,0,0.8); z-index:300; width:90%; max-width:480px; backdrop-filter:blur(10px); }
+#guidance-chara { font-size:52px; margin-bottom:4px; animation: bounce 1.5s infinite alternate; }
+@keyframes bounce { 0% { transform: translateY(0); } 100% { transform: translateY(-8px); } }
+
+/* ゲームクリア画面 */
+#clear-overlay { position:absolute; top:0; left:0; width:100vw; height:100vh; background:rgba(15, 23, 42, 0.92); color:#fff; display:none; flex-direction:column; align-items:center; justify-content:center; z-index:400; backdrop-filter:blur(12px); text-align:center; padding:20px; }
+
+#result-display { position:absolute; top:40%; left:50%; transform:translate(-50%,-50%); font-size:160px; font-weight:bold; z-index:200; display:none; pointer-events:none; }
+.correct { color:#ef4444; text-shadow:0 0 25px rgba(239,68,68,0.8); }
+.incorrect { color:#3b82f6; text-shadow:0 0 25px rgba(59,130,246,0.8); }
+
+.touch-hint { position:absolute; bottom:20px; right:20px; background:rgba(15,23,42,0.8); color:#fff; padding:10px 18px; border-radius:30px; font-size:13px; border:1px solid #38bdf8; pointer-events:none; z-index:10; }
+</style>
+</head>
+<body>
+
+<!-- ミニマップキャンバス -->
+<canvas id="map"></canvas>
+
+<!-- 案内情報 -->
+<div id="info">
+  <h3>🏫 学校クイズラリー 3D</h3>
+  <div>教室の黒板に近づいて<b>4択クイズ</b>に挑戦！</div>
+  <div style="margin-top:2px; color:#d97706; font-weight:bold;">💮 目指せ 花丸スタンプ 8個全制覇！</div>
+</div>
+
+<!-- スタンプカードHUDボタン -->
+<div id="stamp-hud-btn" onclick="openStampModal()">
+  <span style="font-size:20px;">💮</span>
+  <span>スタンプ帳 (<span id="stamp-count-hud">0</span>/8)</span>
+</div>
+
+<div class="touch-hint">👈 画面を左右にドラッグで視点変更（上下固定）</div>
+
+<!-- 初回ガイダンス画面 -->
+<div id="guidance-overlay">
+  <div id="guidance-chara">👩‍🏫</div>
+  <div style="font-size:22px; font-weight:bold; color:#38bdf8; margin-bottom:8px;">ようこそ！学校スタンプラリーへ</div>
+  <div style="font-size:14px; line-height:1.6; margin-bottom:14px; background:rgba(255,255,255,0.08); padding:12px; border-radius:12px; text-align:left;">
+    学校のあちこちにある<b>8つの教室</b>を探検しよう！<br>
+    黒板の近くに行くと<b>「4択クイズ」</b>が出題されるよ！<br>
+    見事正解すると<b>「花丸スタンプ」</b>が押されるよ💮<br>
+    スタンプを8個全部集めて<b>ゲームクリア</b>を目指してね！
+    
+    <div style="background:rgba(56, 189, 248, 0.15); border-left:4px solid #38bdf8; padding:8px 12px; margin-top:10px; border-radius:4px; font-size:13px;">
+      <b>💻 操作方法:</b><br>
+      ・<b>W / S (↑ / ↓)</b>: 前進 / 後退<br>
+      ・<b>A / D (← / →)</b>: 左移動 / 右移動（カニ歩き）<br>
+      ・<b>画面左右ドラッグ</b>: 左右を見渡す（上下固定）
+    </div>
+  </div>
+  <button onclick="closeGuidanceUI()" style="padding:12px 32px; font-size:18px; background:#22c55e; color:white; border:none; border-radius:30px; font-weight:bold; cursor:pointer; box-shadow:0 4px 15px rgba(34,197,94,0.4);">
+    探検＆クイズをスタート！
+  </button>
+</div>
+
+<!-- クイズUI (4択) -->
+<div id="quiz-overlay">
+  <div style="font-size:14px; color:#38bdf8; font-weight:bold; margin-bottom:4px;" id="quiz-room-title">第 1 教室</div>
+  <div id="quiz-question" style="font-size:18px; font-weight:bold; min-height:48px; display:flex; align-items:center; justify-content:center;">問題</div>
+  <div id="quiz-options">
+    <!-- JSで4択ボタンを挿入 -->
+  </div>
+</div>
+
+<!-- スタンプ帳 モーダル -->
+<div id="stamp-modal">
+  <div style="font-size:22px; font-weight:bold; color:#b45309;">💮 花丸スタンプカード</div>
+  <div style="font-size:13px; color:#78350f; margin-bottom:6px;">8つの教室のクイズに答えてスタンプを集めよう！</div>
+  
+  <div class="stamp-grid" id="stamp-grid-container">
+    <!-- JSで8つのスタンプ枠を生成 -->
+  </div>
+
+  <div style="font-size:14px; font-weight:bold; color:#d97706; margin-bottom:12px;">
+    集めたスタンプ: <span id="modal-stamp-count">0</span> / 8 個
+  </div>
+
+  <button onclick="closeStampModal()" style="padding:8px 24px; background:#f59e0b; color:#fff; font-weight:bold; border:none; border-radius:20px; font-size:15px; cursor:pointer; box-shadow:0 3px 8px rgba(0,0,0,0.2);">
+    閉じる
+  </button>
+</div>
+
+<!-- 博士雑学画面 -->
+<div id="hakase-overlay">
+  <div style="color:#f1c40f;font-weight:bold;margin-bottom:8px;font-size:18px;">🎓 博士の雑学コーナー</div>
+  <div id="hakase-text" style="font-size:15px; line-height:1.5;">...</div>
+  <button onclick="closeHakaseUI()">閉じる</button>
+</div>
+
+<!-- 正解・不正解まるばつ表示 -->
+<div id="result-display">〇</div>
+
+<!-- 全クリア達成画面 -->
+<div id="clear-overlay">
+  <div style="font-size:80px; margin-bottom:10px;">🎉💮🏫</div>
+  <div style="font-size:36px; font-weight:bold; color:#fef08a; text-shadow:0 0 20px rgba(250,204,21,0.6);">全問題クリアおめでとう！</div>
+  <div style="font-size:18px; color:#e2e8f0; max-width:460px; margin:16px 0; line-height:1.6;">
+    見事、学校にある8つ全てのクイズに正解して、花丸スタンプをコンプリートしました！素晴らしい探検力です！
+  </div>
+  <button onclick="location.reload()" style="margin-top:10px; padding:14px 36px; background:linear-gradient(135deg, #ef4444, #dc2626); color:#fff; font-size:20px; font-weight:bold; border:none; border-radius:30px; cursor:pointer; box-shadow:0 6px 20px rgba(239,68,68,0.5);">
+    もう一度挑戦する
+  </button>
+</div>
+
+<script src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'></script>
+<script>
+
+// サウンドエフェクト制御
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new AudioContext();
+  }
+}
+
+function playCorrectSound() {
+  initAudio();
+  const now = audioCtx.currentTime;
+  const osc1 = audioCtx.createOscillator();
+  const gain1 = audioCtx.createGain();
+  osc1.type = 'sine';
+  osc1.frequency.setValueAtTime(659.25, now);
+  gain1.gain.setValueAtTime(0.3, now);
+  gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+  osc1.connect(gain1); gain1.connect(audioCtx.destination);
+  osc1.start(now); osc1.stop(now + 0.4);
+
+  const osc2 = audioCtx.createOscillator();
+  const gain2 = audioCtx.createGain();
+  osc2.type = 'sine';
+  osc2.frequency.setValueAtTime(1046.5, now + 0.15);
+  gain2.gain.setValueAtTime(0.3, now + 0.15);
+  gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.7);
+  osc2.connect(gain2); gain2.connect(audioCtx.destination);
+  osc2.start(now + 0.15); osc2.stop(now + 0.7);
+}
+
+function playIncorrectSound() {
+  initAudio();
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(130, now);
+  gain.gain.setValueAtTime(0.3, now);
+  gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(now); osc.stop(now + 0.5);
+}
+
+function playClearFanfare() {
+  initAudio();
+  const now = audioCtx.currentTime;
+  const freqs = [523.25, 659.25, 783.99, 1046.50];
+  freqs.forEach((f, idx) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(f, now + idx * 0.12);
+    gain.gain.setValueAtTime(0.35, now + idx * 0.12);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.8);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(now + idx * 0.12); osc.stop(now + idx * 0.12 + 0.8);
+  });
+}
+
+function playExclamationSound() {
+  initAudio();
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(440, now);
+  osc.frequency.exponentialRampToValueAtTime(880, now + 0.15);
+  gain.gain.setValueAtTime(0.3, now);
+  gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(now); osc.stop(now + 0.25);
+}
+
+function speakText(text, pitch = 1.0, rate = 1.0, onEndCallback = null) {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+    const uttr = new SpeechSynthesisUtterance(text);
+    uttr.lang = 'ja-JP';
+    uttr.pitch = pitch;
+    uttr.rate = rate;
+    if(onEndCallback) uttr.onend = onEndCallback;
+    window.speechSynthesis.speak(uttr);
+  } else if(onEndCallback) {
+    setTimeout(onEndCallback, 3000);
+  }
+}
+
+// 3Dシーン初期化
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xaed8f2); 
+scene.fog = new THREE.FogExp2(0xaed8f2, 0.002);
+
+const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true; 
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; 
+renderer.toneMappingExposure = 1.1; 
+document.body.appendChild(renderer.domElement);
+
+// プレイヤー位置と視点（Y軸固定）
+const playerPos = new THREE.Vector3(0, 1.7, 20);
+let targetYaw = 0;
+let currentYaw = 0;
+
+camera.position.copy(playerPos);
+camera.rotation.order = 'YXZ';
+
+// ライティング
+scene.add(new THREE.AmbientLight(0xffffff, 0.85)); 
+let sunLight = new THREE.DirectionalLight(0xfffdf0, 1.0);
+sunLight.position.set(-30, 60, 20);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
+scene.add(sunLight);
+
+// マテリアル
+const wallMat   = new THREE.MeshStandardMaterial({color:0xdcd5cc, roughness:0.8}); 
+const floorMat  = new THREE.MeshStandardMaterial({color:0xd2ba9f, roughness:0.6}); 
+const floor2Mat = new THREE.MeshStandardMaterial({color:0xd2ba9f, roughness:0.6, side: THREE.DoubleSide}); 
+const deskMat   = new THREE.MeshStandardMaterial({color:0xb58f63, roughness:0.5}); 
+const pipeMat   = new THREE.MeshStandardMaterial({color:0x777777, roughness:0.4, metalness:0.5}); 
+
+let floor1 = new THREE.Mesh(new THREE.PlaneGeometry(150, 150), floorMat);
+floor1.rotation.x = -Math.PI / 2; floor1.receiveShadow = true; scene.add(floor1);
+
+let floor2 = new THREE.Mesh(new THREE.PlaneGeometry(80, 60), floor2Mat);
+floor2.rotation.x = -Math.PI / 2; floor2.position.set(0, 5.5, -5);
+floor2.receiveShadow = true; floor2.castShadow = true; scene.add(floor2);
+
+const humans = [];
+const classroomAreas = [];
+const allSeats = []; 
+const quizBoards = []; 
+
+const xMin = -40, xMax = 40;
+const zMin = -35, zMax = 25;
+
+// 8つの4択クイズデータ (1階4つ、2階4つ)
+const quizData = [
+  { id: 0, roomName: "1階 1号室", cx: -30, cz: 15,  cy: 0,   q: "日本で一番高い山は？", options: ["富士山", "北岳", "高尾山", "阿蘇山"], a: 0 },
+  { id: 1, roomName: "1階 2号室", cx: 30,  cz: 15,  cy: 0,   q: "リンゴを英語で言うと？", options: ["apple", "orange", "banana", "grape"], a: 0 },
+  { id: 2, roomName: "1階 3号室", cx: -30, cz: -25, cy: 0,   q: "100の半分はいくつ？", options: ["25", "50", "75", "200"], a: 1 },
+  { id: 3, roomName: "1階 4号室", cx: 30,  cz: -25, cy: 0,   q: "太陽がのぼる方角は？", options: ["西", "南", "東", "北"], a: 2 },
+  { id: 4, roomName: "2階 1号室", cx: -30, cz: 15,  cy: 5.5, q: "「山」の対義語（逆の言葉）は？", options: ["海", "川", "谷", "空"], a: 1 },
+  { id: 5, roomName: "2階 2号室", cx: 30,  cz: 15,  cy: 5.5, q: "イヌを英語で言うと？", options: ["cat", "dog", "bird", "fish"], a: 1 },
+  { id: 6, roomName: "2階 3号室", cx: -30, cz: -25, cy: 5.5, q: "30の3倍はいくつ？", options: ["60", "90", "120", "150"], a: 1 },
+  { id: 7, roomName: "2階 4号室", cx: 30,  cz: -25, cy: 5.5, q: "15 ＋ 15 はいくつ？", options: ["20", "25", "30", "35"], a: 2 }
+];
+
+let activeQuiz = null;
+const clearedStamps = new Array(8).fill(false);
+
+const triviaList = [
+  "キリンの首の骨の数は、人間と同じ７個なんじゃよ！",
+  "イチゴの表面にあるつぶつぶは、果実ではなく種子を包む果実なんじゃ！",
+  "バナナは実のところ、木ではなく巨大な草の実なんじゃよ。",
+  "フラミンゴがピンク色なのは、食べているエビや藻の成分のせいなんじゃ。",
+  "ナマケモノは満腹のまま餓死することがあるんじゃ。胃の中の物を消化するエネルギーすら湧かないからなんじゃな。"
+];
+
+function createBoardMaterials(roomName, questionText) {
+  const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#163d22'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = '#855e42'; ctx.lineWidth = 30; ctx.strokeRect(15, 15, canvas.width - 30, canvas.height - 30);
+  ctx.fillStyle = '#fef08a'; ctx.font = 'bold 44px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(`【 ${roomName} 】`, canvas.width / 2, canvas.height / 2 - 90);
+  ctx.fillStyle = '#ffffff'; ctx.font = 'bold 54px sans-serif';
+  ctx.fillText(questionText, canvas.width / 2, canvas.height / 2 + 30);
+  const texture = new THREE.CanvasTexture(canvas);
+  
+  const frontMat = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.8 });
+  const backMat = new THREE.MeshStandardMaterial({ color: 0x163d22, roughness: 0.8 });
+  return [backMat, backMat, backMat, backMat, frontMat, backMat];
+}
+
+function createStairs() {
+  const stairGroup = new THREE.Group();
+  stairGroup.position.set(0, 0, -2); 
+  const steps = 24, totalHeight = 5.5, stairWidth = 5, totalDepth = 12;
+
+  for (let i = 0; i < steps; i++) {
+    let stepH = totalHeight / steps;
+    let geo = new THREE.BoxGeometry(stairWidth, stepH, totalDepth / steps);
+    let mesh = new THREE.Mesh(geo, deskMat);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    mesh.position.set(0, (i * stepH) + stepH/2, - (i * (totalDepth / steps)));
+    stairGroup.add(mesh);
+  }
+
+  let railGeo = new THREE.BoxGeometry(0.2, totalHeight + 1, totalDepth);
+  let railL = new THREE.Mesh(railGeo, wallMat);
+  railL.position.set(-stairWidth/2 - 0.1, totalHeight/2, -totalDepth/2);
+  let railR = railL.clone(); railR.position.x = stairWidth/2 + 0.1;
+  stairGroup.add(railL, railR);
+  scene.add(stairGroup);
+}
+createStairs();
+
+function createHakaseHat() {
+  const hatGroup = new THREE.Group();
+  const capMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5 });
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.25, 0.2, 16), capMat);
+  base.position.y = 0.1; hatGroup.add(base);
+
+  const topPlate = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.03, 0.65), capMat);
+  topPlate.position.y = 0.2; hatGroup.add(topPlate);
+
+  const tasselMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, roughness: 0.3 });
+  const tassel = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.03, 0.25, 8), tasselMat);
+  tassel.position.set(0.25, 0.08, 0.25); hatGroup.add(tassel);
+
+  return hatGroup;
+}
+
+function createExclamationMark() {
+  const group = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color: 0xf1c40f });
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.45, 0.12), mat); bar.position.y = 0.3; group.add(bar);
+  const dot = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.12), mat); dot.position.y = -0.05; group.add(dot);
+  group.position.set(0, 3.2, 0); group.visible = false;
+  return group;
+}
+
+function createHuman(x, y, z, seated = false, seatRef = null) {
+  let g = new THREE.Group();
+  let skinColor = 0xffc0a0;
+  let colors = [0x4a90e2, 0xe67e22, 0x2ecc71, 0xe74c3c, 0x9b59b6];
+  
+  let isHakase = Math.random() < 0.15;
+  let clothesColor = isHakase ? 0x2c3e50 : colors[Math.floor(Math.random() * colors.length)];
+  
+  let pMat = new THREE.MeshStandardMaterial({color: clothesColor, roughness: 0.7});
+  let sMat = new THREE.MeshStandardMaterial({color: skinColor, roughness: 0.6});
+  let pantsMat = new THREE.MeshStandardMaterial({color: 0x34495e, roughness: 0.7});
+
+  let head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 16), sMat); head.castShadow = true; g.add(head);
+  
+  let exclamationMark = null;
+  if(isHakase) {
+    let hat = createHakaseHat(); hat.position.set(0, 0.25, 0); head.add(hat);
+    exclamationMark = createExclamationMark(); g.add(exclamationMark);
+  }
+
+  let eyeGeo = new THREE.SphereGeometry(0.04, 8, 8);
+  let eyeL = new THREE.Mesh(eyeGeo, new THREE.MeshBasicMaterial({color:0x111111})); let eyeR = eyeL.clone();
+
+  let armL = new THREE.Group(); let armR = new THREE.Group(); let legL = new THREE.Group(); let legR = new THREE.Group();
+  let armLMesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 0.2), pMat); armLMesh.castShadow = true; armL.add(armLMesh);
+  let armRMesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 0.2), pMat); armRMesh.castShadow = true; armR.add(armRMesh);
+  let legLMesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.8, 0.22), pantsMat); legLMesh.castShadow = true; legL.add(legLMesh);
+  let legRMesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.8, 0.22), pantsMat); legRMesh.castShadow = true; legR.add(legRMesh);
+  g.add(armL, armR, legL, legR);
+
+  let body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.4, 0.4), pMat); body.castShadow = true; g.add(body);
+  g.add(eyeL, eyeR); scene.add(g);
+
+  let voicePitch = isHakase ? 0.6 : (0.7 + Math.random() * 0.7);
+  let voiceRate  = 0.8 + Math.random() * 0.4;
+
+  let hInfo = {
+    obj: g, body: body, head: head, eyeL: eyeL, eyeR: eyeR,
+    armL: armL, armR: armR, legL: legL, legR: legR,
+    armLMesh: armLMesh, armRMesh: armRMesh, legLMesh: legLMesh, legRMesh: legRMesh,
+    angle: Math.random() * Math.PI * 2, turnTimer: 100, floorY: y,
+    walk: !seated, stateTimer: 150 + Math.random() * 200, animOffset: Math.random() * 100,
+    currentSeat: seatRef, bowTimer: 0, isCooldown: false, movingToSeat: false,
+    isHakase: isHakase, exclamationMark: exclamationMark,
+    voicePitch: voicePitch, voiceRate: voiceRate, hakaseState: 'idle'
+  };
+
+  if (seated) { setSeatedPose(hInfo); g.position.set(x, y, z); if(seatRef) seatRef.occupied = hInfo; } 
+  else { setStandingPose(hInfo); g.position.set(x, y, z); }
+  humans.push(hInfo);
+}
+
+function setSeatedPose(h) {
+   h.body.scale.set(1, 0.85, 1); h.body.position.set(0, 1.1, -0.1); h.body.rotation.x = -0.12; 
+   h.head.position.set(0, 1.95, -0.05); h.eyeL.position.set(-0.1, 2.0, 0.28); h.eyeR.position.set(0.1, 2.0, 0.28);
+   h.armL.position.set(-0.5, 1.2, 0.2); h.armL.rotation.set(-Math.PI / 3, 0, 0); h.armLMesh.position.set(0, 0, 0);
+   h.armR.position.set(0.5, 1.2, 0.2);  h.armR.rotation.set(-Math.PI / 3, 0, 0); h.armRMesh.position.set(0, 0, 0);
+   h.legL.position.set(-0.25, 0.5, 0.5); h.legL.rotation.set(-Math.PI / 4, 0, 0); h.legLMesh.position.set(0, 0, 0);
+   h.legR.position.set(0.25, 0.5, 0.5);  h.legR.rotation.set(-Math.PI / 4, 0, 0); h.legRMesh.position.set(0, 0, 0);
+   h.obj.rotation.y = Math.PI; 
+}
+
+function setStandingPose(h) {
+   h.body.scale.set(1, 1, 1); h.body.position.set(0, 1.5, 0); h.body.rotation.x = 0; h.head.rotation.x = 0;
+   h.head.position.set(0, 2.4, 0); h.eyeL.position.set(-0.1, 2.45, 0.33); h.eyeR.position.set(0.1, 2.45, 0.33);
+   h.armL.position.set(-0.52, 2.0, 0); h.armL.rotation.set(0,0,0); h.armLMesh.position.set(0, -0.35, 0);
+   h.armR.position.set(0.52, 2.0, 0); h.armR.rotation.set(0,0,0); h.armRMesh.position.set(0, -0.35, 0);
+   h.legL.position.set(-0.24, 0.8, 0); h.legL.rotation.set(0,0,0); h.legLMesh.position.set(0, -0.4, 0);
+   h.legR.position.set(0.24, 0.8, 0); h.legR.rotation.set(0,0,0); h.legRMesh.position.set(0, -0.4, 0);
+}
+
+function moveHumans(){
+  let time = Date.now() * 0.008; 
+
+  for(let i = 0; i < humans.length; i++) {
+    let h1 = humans[i]; if(!h1.walk || h1.bowTimer > 0 || h1.isCooldown || h1.movingToSeat || h1.hakaseState === 'speaking' || h1.hakaseState === 'waiting_to_leave') continue;
+    for(let j = i + 1; j < humans.length; j++) {
+      let h2 = humans[j]; if(!h2.walk || h2.bowTimer > 0 || h2.isCooldown || h2.movingToSeat || h2.hakaseState === 'speaking' || h2.hakaseState === 'waiting_to_leave') continue;
+      if(h1.floorY === h2.floorY && Math.hypot(h1.obj.position.x - h2.obj.position.x, h1.obj.position.z - h2.obj.position.z) < 1.8) {
+        h1.bowTimer = 300; h2.bowTimer = 300; h1.isCooldown = true; h2.isCooldown = true;
+        h1.angle += Math.PI; h2.angle += Math.PI;
+      }
+    }
+  }
+
+  for(let h of humans){
+    if(h.isHakase && (h.hakaseState === 'speaking' || h.hakaseState === 'waiting_to_leave')) {
+      h.legL.rotation.x = 0; h.legR.rotation.x = 0;
+      h.armL.rotation.x = 0; h.armR.rotation.x = 0;
+      if(h.exclamationMark && h.exclamationMark.visible) {
+        h.exclamationMark.quaternion.copy(camera.quaternion);
+      }
+      continue;
+    }
+
+    if(h.bowTimer === 0 && !h.movingToSeat) {
+      h.stateTimer--;
+      if(h.stateTimer <= 0) {
+        h.stateTimer = 200 + Math.random() * 200; 
+        if(Math.random() < 0.45) { 
+          if(!h.walk) { 
+            if(h.currentSeat) { h.currentSeat.occupied = null; h.currentSeat = null; }
+            setStandingPose(h); h.walk = true; h.obj.position.z -= 0.5;
+          } else { 
+            let emptySeats = allSeats.filter(s => !s.occupied && s.y === h.floorY);
+            if(emptySeats.length > 0) {
+              emptySeats.sort((a, b) => {
+                let distA = Math.hypot(a.x - h.obj.position.x, a.z - h.obj.position.z);
+                let distB = Math.hypot(b.x - h.obj.position.x, b.z - h.obj.position.z);
+                return distA - distB;
+              });
+              let targetSeat = emptySeats[0];
+              targetSeat.occupied = h; h.currentSeat = targetSeat; h.movingToSeat = true; 
+            }
+          }
+        }
+      }
+    }
+
+    if(h.movingToSeat && h.currentSeat) {
+      let tSeat = h.currentSeat;
+      let dist = Math.hypot(tSeat.x - h.obj.position.x, tSeat.z - h.obj.position.z);
+      if(dist > 0.2) {
+        h.angle = Math.atan2(tSeat.x - h.obj.position.x, tSeat.z - h.obj.position.z);
+        h.obj.rotation.y = h.angle;
+        h.obj.position.x += Math.sin(h.angle) * 0.05; h.obj.position.z += Math.cos(h.angle) * 0.05;
+        let swing = Math.sin(time + h.animOffset) * 0.6;
+        h.legL.rotation.x = swing; h.legR.rotation.x = -swing;
+        h.armL.rotation.x = -swing * 0.9; h.armR.rotation.x = swing * 0.9;
+      } else {
+        setSeatedPose(h); h.obj.position.set(tSeat.x, h.floorY, tSeat.z); h.movingToSeat = false; h.walk = false;
+      }
+      continue;
+    }
+
+    if(!h.walk) continue;
+
+    if(h.bowTimer > 0) {
+      h.bowTimer--;
+      let bowWave = Math.sin(((300 - h.bowTimer) / 300) * Math.PI);
+      h.body.rotation.x = bowWave * 0.45; h.head.rotation.x = bowWave * 0.55;
+      h.legL.rotation.x = 0; h.legR.rotation.x = 0; h.armL.rotation.x = 0; h.armR.rotation.x = 0;
+      if(h.bowTimer === 0) { h.body.rotation.x = 0; h.head.rotation.x = 0; setTimeout(() => { h.isCooldown = false; }, 2000); }
+      continue; 
+    }
+
+    let swing = Math.sin(time + h.animOffset) * 0.6; 
+    h.legL.rotation.x = swing; h.legR.rotation.x = -swing;
+    h.armL.rotation.x = -swing * 0.9; h.armR.rotation.x = swing * 0.9;
+
+    h.turnTimer--;
+    if(h.turnTimer <= 0){ h.angle += (Math.random() - 0.5) * 1.5; h.turnTimer = 80 + Math.random() * 100; }
+    h.obj.rotation.y = h.angle;
+    
+    let speed = (h.isHakase && h.hakaseState === 'leaving') ? 0.05 : 0.03;
+    h.obj.position.x += Math.sin(h.angle) * speed; h.obj.position.z += Math.cos(h.angle) * speed;
+
+    if(h.obj.position.x < xMin) { h.obj.position.x = xMin; h.angle += Math.PI; }
+    if(h.obj.position.x > xMax) { h.obj.position.x = xMax; h.angle += Math.PI; }
+    if(h.obj.position.z < zMin) { h.obj.position.z = zMin; h.angle += Math.PI; }
+    if(h.obj.position.z > zMax) { h.obj.position.z = zMax; h.angle += Math.PI; }
+  }
+}
+
+let quizAnsweredCooldown = null;
+let activeHakase = null;
+
+function checkProximity() {
+  let pPos = playerPos;
+
+  // 1. 教室の黒板クイズ判定
+  let nearAnyBoard = false;
+  for(let b of quizBoards) {
+    let dist = Math.hypot(pPos.x - b.x, pPos.z - b.z);
+    let heightDiff = Math.abs(pPos.y - (b.y + 1.7));
+
+    if(dist < 2.8 && heightDiff < 2.0) { 
+      nearAnyBoard = true;
+      if(activeQuiz !== b && quizAnsweredCooldown !== b) {
+        activeQuiz = b;
+        showQuizUI(b);
+      }
+      break;
+    }
+  }
+  if(!nearAnyBoard) {
+    if(activeQuiz !== null) hideQuizUI();
+    activeQuiz = null;
+    quizAnsweredCooldown = null;
+  }
+
+  // 2. 博士の雑学判定
+  for(let h of humans) {
+    if(!h.isHakase || h.hakaseState === 'leaving' || h.hakaseState === 'waiting_to_leave') continue;
+    let dist = Math.hypot(pPos.x - h.obj.position.x, pPos.z - h.obj.position.z);
+    let heightDiff = Math.abs(pPos.y - (h.floorY + 1.7));
+
+    if(dist < 2.5 && heightDiff < 1.5) {
+      if(activeHakase !== h) {
+        activeHakase = h;
+        triggerHakaseSequence(h);
+      }
+      break;
+    }
+  }
+}
+
+// 4択クイズUIの生成＆表示
+function showQuizUI(board) {
+  const overlay = document.getElementById('quiz-overlay');
+  document.getElementById('quiz-room-title').innerText = `【 ${board.roomName} 】`;
+  document.getElementById('quiz-question').innerText = board.q;
+
+  const optsContainer = document.getElementById('quiz-options');
+  optsContainer.innerHTML = "";
+
+  board.options.forEach((optText, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'quiz-opt-btn';
+    btn.innerText = `${idx + 1}. ${optText}`;
+    btn.onclick = () => handleChoiceSelect(idx);
+    optsContainer.appendChild(btn);
+  });
+
+  overlay.style.display = 'block';
+}
+
+function hideQuizUI() {
+  document.getElementById('quiz-overlay').style.display = 'none';
+}
+
+function handleChoiceSelect(chosenIndex) {
+  if(!activeQuiz) return;
+
+  const resDisplay = document.getElementById('result-display');
+  const board = activeQuiz;
+
+  if(chosenIndex === board.a) {
+    // 正解処理
+    resDisplay.innerText = "〇";
+    resDisplay.className = "correct";
+    playCorrectSound();
+    
+    // スタンプ獲得処理
+    if(!clearedStamps[board.id]) {
+      clearedStamps[board.id] = true;
+      updateStampCardUI();
+      
+      // スタンプゲット通知モーダルを表示
+      setTimeout(() => {
+        openStampModal(board.id);
+      }, 700);
+    }
+
+  } else {
+    // 不正解処理
+    resDisplay.innerText = "×";
+    resDisplay.className = "incorrect";
+    playIncorrectSound();
+  }
+
+  resDisplay.style.display = 'block';
+  hideQuizUI();
+  quizAnsweredCooldown = board;
+  activeQuiz = null;
+
+  setTimeout(() => {
+    resDisplay.style.display = 'none';
+  }, 1200);
+}
+
+function initStampGrid() {
+  const container = document.getElementById('stamp-grid-container');
+  container.innerHTML = "";
+
+  quizData.forEach((q, idx) => {
+    const slot = document.createElement('div');
+    slot.className = 'stamp-slot';
+    slot.id = `stamp-slot-${idx}`;
+    slot.innerHTML = `
+      <span>第${idx + 1}問</span>
+      <div class="stamp-mark" id="stamp-mark-${idx}">💮</div>
+    `;
+    container.appendChild(slot);
+  });
+}
+initStampGrid();
+
+function updateStampCardUI() {
+  const count = clearedStamps.filter(Boolean).length;
+  document.getElementById('stamp-count-hud').innerText = count;
+  document.getElementById('modal-stamp-count').innerText = count;
+
+  clearedStamps.forEach((isCleared, idx) => {
+    const mark = document.getElementById(`stamp-mark-${idx}`);
+    if(mark) {
+      if(isCleared) mark.classList.add('stamped');
+      else mark.classList.remove('stamped');
+    }
+  });
+
+  // 全クイズクリア判定
+  if(count === 8) {
+    setTimeout(() => {
+      triggerGameClear();
+    }, 1500);
+  }
+}
+
+function openStampModal(highlightId = null) {
+  updateStampCardUI();
+  const modal = document.getElementById('stamp-modal');
+  modal.style.display = 'block';
+
+  if(highlightId !== null) {
+    const mark = document.getElementById(`stamp-mark-${highlightId}`);
+    if(mark) {
+      mark.classList.remove('stamped');
+      setTimeout(() => {
+        mark.classList.add('stamped');
+      }, 200);
+    }
+  }
+}
+
+function closeStampModal() {
+  document.getElementById('stamp-modal').style.display = 'none';
+}
+
+function triggerGameClear() {
+  closeStampModal();
+  hideQuizUI();
+  playClearFanfare();
+  document.getElementById('clear-overlay').style.display = 'flex';
+  speakText("おめでとうございます！すべてのクイズに正解して、花丸スタンプをコンプリートしました！クリアおめでとう！", 1.1, 1.0);
+}
+
+function triggerHakaseSequence(h) {
+  h.hakaseState = 'speaking';
+  if(!h.walk) {
+    if(h.currentSeat) { h.currentSeat.occupied = null; h.currentSeat = null; }
+    setStandingPose(h); h.walk = true;
+  }
+
+  h.angle = Math.atan2(playerPos.x - h.obj.position.x, playerPos.z - h.obj.position.z);
+  h.obj.rotation.y = h.angle;
+
+  if(h.exclamationMark) h.exclamationMark.visible = true;
+  playExclamationSound();
+
+  const trivia = triviaList[Math.floor(Math.random() * triviaList.length)];
+  document.getElementById('hakase-text').innerText = trivia;
+  document.getElementById('hakase-overlay').style.display = 'block';
+
+  speakText(trivia, h.voicePitch, h.voiceRate);
+}
+
+function closeHakaseUI() {
+  document.getElementById('hakase-overlay').style.display = 'none';
+  if('speechSynthesis' in window) window.speechSynthesis.cancel();
+  
+  if(activeHakase) {
+    let h = activeHakase;
+    if(h.exclamationMark) h.exclamationMark.visible = false;
+    h.hakaseState = 'waiting_to_leave';
+
+    setTimeout(() => {
+      h.hakaseState = 'leaving';
+      h.angle += Math.PI + (Math.random() - 0.5);
+      h.obj.rotation.y = h.angle;
+      activeHakase = null;
+    }, 3000);
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  if(e.key === 'Escape') {
+    closeHakaseUI();
+    closeStampModal();
+  }
+});
+
+function classroom(config){
+  let cx = config.cx, cz = config.cz, cy = config.cy;
+  classroomAreas.push({x:cx, z:cz}); 
+
+  let boardMats = createBoardMaterials(config.roomName, config.q);
+  let board = new THREE.Mesh(new THREE.BoxGeometry(8, 3.8, 0.15), boardMats);
+  board.position.set(cx, cy + 2.5, cz - 7.5);
+  board.castShadow = true; board.receiveShadow = true;
+  scene.add(board);
+
+  quizBoards.push({
+    id: config.id, roomName: config.roomName,
+    x: cx, z: cz - 6.5, y: cy,
+    q: config.q, options: config.options, a: config.a
+  });
+
+  let backWall = new THREE.Mesh(new THREE.BoxGeometry(18, 5, 0.3), wallMat);
+  backWall.position.set(cx, cy + 2.5, cz - 8);
+  backWall.receiveShadow = true; scene.add(backWall);
+
+  let sideWallL = new THREE.Mesh(new THREE.BoxGeometry(0.3, 5, 16), wallMat);
+  sideWallL.position.set(cx - 9, cy + 2.5, cz);
+  sideWallL.receiveShadow = true; scene.add(sideWallL);
+
+  let sideWallR = sideWallL.clone();
+  sideWallR.position.x = cx + 9;
+  scene.add(sideWallR);
+
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 3; c++) {
+      let sx = cx - 4 + c * 4;
+      let sz = cz - 2 + r * 4;
+
+      let deskGroup = new THREE.Group();
+      let top = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.1, 1.0), deskMat);
+      top.position.y = 1.1; top.castShadow = true; top.receiveShadow = true;
+      deskGroup.add(top);
+
+      let legGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.1, 8);
+      let leg1 = new THREE.Mesh(legGeo, pipeMat); leg1.position.set(-0.7, 0.55, -0.4);
+      let leg2 = leg1.clone(); leg2.position.set(0.7, 0.55, -0.4);
+      let leg3 = leg1.clone(); leg3.position.set(-0.7, 0.55, 0.4);
+      let leg4 = leg1.clone(); leg4.position.set(0.7, 0.55, 0.4);
+      deskGroup.add(leg1, leg2, leg3, leg4);
+
+      let chair = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.08, 0.8), deskMat);
+      chair.position.set(0, 0.6, 0.8); chair.castShadow = true;
+      deskGroup.add(chair);
+
+      deskGroup.position.set(sx, cy, sz);
+      scene.add(deskGroup);
+
+      let seatObj = { x: sx, y: cy, z: sz + 0.8, occupied: null };
+      allSeats.push(seatObj);
+
+      if (Math.random() < 0.6) {
+        createHuman(sx, cy, sz + 0.8, true, seatObj);
+      }
+    }
+  }
+}
+
+quizData.forEach(q => classroom(q));
+
+for (let i = 0; i < 12; i++) {
+  let is2F = Math.random() < 0.5;
+  let hy = is2F ? 5.5 : 0;
+  let hx = (Math.random() - 0.5) * 60;
+  let hz = (Math.random() - 0.5) * 40;
+  createHuman(hx, hy, hz, false);
+}
+
+const moveState = { forward: false, backward: false, left: false, right: false };
+
+document.addEventListener('keydown', (e) => {
+  if (e.repeat) return;
+  if (e.code === 'KeyW' || e.code === 'ArrowUp') moveState.forward = true;
+  if (e.code === 'KeyS' || e.code === 'ArrowDown') moveState.backward = true;
+  if (e.code === 'KeyA' || e.code === 'ArrowLeft') moveState.left = true;
+  if (e.code === 'KeyD' || e.code === 'ArrowRight') moveState.right = true;
+});
+
+document.addEventListener('keyup', (e) => {
+  if (e.code === 'KeyW' || e.code === 'ArrowUp') moveState.forward = false;
+  if (e.code === 'KeyS' || e.code === 'ArrowDown') moveState.backward = false;
+  if (e.code === 'KeyA' || e.code === 'ArrowLeft') moveState.left = false;
+  if (e.code === 'KeyD' || e.code === 'ArrowRight') moveState.right = false;
+});
+
+let isDragging = false;
+let lastPointerX = 0;
+
+window.addEventListener('mousedown', (e) => {
+  if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
+    isDragging = true;
+    lastPointerX = e.clientX;
+  }
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (isDragging) {
+    let deltaX = e.clientX - lastPointerX;
+    targetYaw += deltaX * 0.005;
+    lastPointerX = e.clientX;
+  }
+});
+
+window.addEventListener('mouseup', () => { isDragging = false; });
+
+window.addEventListener('touchstart', (e) => {
+  if (e.touches.length > 0 && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
+    isDragging = true;
+    lastPointerX = e.touches[0].clientX;
+  }
+}, {passive: true});
+
+window.addEventListener('touchmove', (e) => {
+  if (isDragging && e.touches.length > 0) {
+    let deltaX = e.touches[0].clientX - lastPointerX;
+    targetYaw += deltaX * 0.005;
+    lastPointerX = e.touches[0].clientX;
+  }
+}, {passive: true});
+
+window.addEventListener('touchend', () => { isDragging = false; });
+
+function showInitialGuidance() {
+  const msg = "ようこそ！学校のあちこちにある8つの教室で4択クイズに答えて、花丸スタンプを8個集めよう！";
+  speakText(msg, 1.1, 1.0);
+}
+
+function closeGuidanceUI() {
+  document.getElementById('guidance-overlay').style.display = 'none';
+  if('speechSynthesis' in window) window.speechSynthesis.cancel();
+  initAudio();
+}
+
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    showInitialGuidance();
+  }, 500);
+});
+
+// 現在の階層管理（1: 1階, 2: 2階）
+let currentFloor = 1;
+
+function updatePlayerMovement() {
+  let diff = targetYaw - currentYaw;
+  if (Math.abs(diff) > 0.0001) {
+    currentYaw += diff * 0.18;
+  } else {
+    currentYaw = targetYaw;
+  }
+
+  camera.rotation.y = currentYaw;
+  camera.rotation.x = 0; // 上下絶対固定
+  camera.rotation.z = 0;
+
+  const speed = 0.18;
+  
+  if (moveState.forward) {
+    playerPos.x -= Math.sin(targetYaw) * speed;
+    playerPos.z -= Math.cos(targetYaw) * speed;
+  }
+  if (moveState.backward) {
+    playerPos.x += Math.sin(targetYaw) * speed;
+    playerPos.z += Math.cos(targetYaw) * speed;
+  }
+  if (moveState.left) {
+    playerPos.x -= Math.cos(targetYaw) * speed;
+    playerPos.z += Math.sin(targetYaw) * speed;
+  }
+  if (moveState.right) {
+    playerPos.x += Math.cos(targetYaw) * speed;
+    playerPos.z -= Math.sin(targetYaw) * speed;
+  }
+
+  // 階段・階層判定（中央の階段エリア：X[-2.5, 2.5], Z[-8.0, 4.0] 内のみ昇降処理）
+  const inStairArea = Math.abs(playerPos.x) < 2.5 && playerPos.z <= 4.0 && playerPos.z >= -8.0;
+
+  if (inStairArea) {
+    // 階段上の高さ計算 (Z: 4.0[1階側] -> -8.0[2階側])
+    let stairRatio = (4.0 - playerPos.z) / 12.0;
+    stairRatio = Math.max(0, Math.min(1, stairRatio));
+    playerPos.y = 1.7 + stairRatio * 5.5;
+
+    // 階段を上りきった・下りきった判定で現在の階層を決定
+    if (playerPos.z <= -7.5) {
+      currentFloor = 2;
+    } else if (playerPos.z >= 3.5) {
+      currentFloor = 1;
+    }
+  } else {
+    // 階段外では現在の階層(currentFloor)の高さを厳密に保持
+    if (currentFloor === 2) {
+      playerPos.y = 7.2; // 2階の目線高さ (5.5 + 1.7)
+    } else {
+      playerPos.y = 1.7; // 1階の目線高さ (0.0 + 1.7)
+    }
+  }
+
+  playerPos.x = Math.max(xMin, Math.min(xMax, playerPos.x));
+  playerPos.z = Math.max(zMin, Math.min(zMax, playerPos.z));
+
+  camera.position.copy(playerPos);
+}
+
+const mapCanvas = document.getElementById('map');
+const mapCtx = mapCanvas.getContext('2d');
+mapCanvas.width = 140; mapCanvas.height = 140;
+
+function drawMinimap() {
+  mapCtx.fillStyle = '#0f172a';
+  mapCtx.fillRect(0, 0, 140, 140);
+
+  const worldToMap = (wx, wz) => {
+    return {
+      x: 70 + wx * 1.5,
+      y: 70 + wz * 1.5
+    };
+  };
+
+  // クイズボード（クリア済みなら赤💮、未消化は緑）
+  for (let b of quizBoards) {
+    let m = worldToMap(b.x, b.z);
+    if(clearedStamps[b.id]) {
+      mapCtx.fillStyle = '#ef4444';
+    } else {
+      mapCtx.fillStyle = '#22c55e';
+    }
+    mapCtx.fillRect(m.x - 3, m.y - 3, 6, 6);
+  }
+
+  for (let h of humans) {
+    let m = worldToMap(h.obj.position.x, h.obj.position.z);
+    if (h.isHakase) {
+      mapCtx.fillStyle = '#f59e0b';
+      mapCtx.beginPath();
+      mapCtx.arc(m.x, m.y, 4, 0, Math.PI * 2);
+      mapCtx.fill();
+    } else {
+      mapCtx.fillStyle = '#38bdf8';
+      mapCtx.beginPath();
+      mapCtx.arc(m.x, m.y, 2.5, 0, Math.PI * 2);
+      mapCtx.fill();
+    }
+  }
+
+  let pMap = worldToMap(playerPos.x, playerPos.z);
+
+  mapCtx.save();
+  mapCtx.translate(pMap.x, pMap.y);
+  mapCtx.rotate(-targetYaw + Math.PI);
+  mapCtx.fillStyle = '#ef4444';
+  mapCtx.beginPath();
+  mapCtx.moveTo(0, -7);
+  mapCtx.lineTo(5, 5);
+  mapCtx.lineTo(-5, 5);
+  mapCtx.closePath();
+  mapCtx.fill();
+  mapCtx.restore();
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  updatePlayerMovement();
+  moveHumans();
+  checkProximity();
+  drawMinimap();
+
+  renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+animate();
+
+</script>
+</body>
+</html>
