@@ -1,0 +1,1859 @@
+<!DOCTYPE html>
+<html lang='ja'>
+<head>
+<meta charset='UTF-8'>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>3ステージ3D歴史クイズアドベンチャー</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body { margin:0; overflow:hidden; background:#0f172a; touch-action:none; user-select:none; -webkit-user-select:none; font-family:'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
+#map { position:absolute; top:12px; left:12px; width:150px; height:150px; background:#0f172a; border:2px solid #38bdf8; border-radius:14px; z-index:10; box-shadow:0 6px 16px rgba(0,0,0,0.4); }
+
+/* ヘッダー情報 */
+#info { position:absolute; top:12px; left:174px; color:#1e293b; background:rgba(255,255,255,0.92); padding:10px 14px; border-radius:12px; line-height:1.4; box-shadow:0 4px 12px rgba(0,0,0,0.25); max-width:300px; z-index:10; font-size:12px; backdrop-filter:blur(8px); }
+#info h3 { margin:0 0 4px 0; font-size:14px; font-weight:bold; color:#1d4ed8; border-bottom:2px solid #3b82f6; padding-bottom:2px; display:flex; align-items:center; justify-content:space-between; }
+.stage-badge { background:#0284c7; color:#fff; font-size:10px; padding:2px 8px; border-radius:10px; font-weight:normal; }
+
+/* スタンプカードHUDボタン */
+#stamp-hud-btn { position:absolute; top:12px; right:12px; background:linear-gradient(135deg, #f59e0b, #d97706); color:#fff; font-weight:bold; padding:10px 18px; border-radius:24px; box-shadow:0 4px 15px rgba(217,119,6,0.4); cursor:pointer; z-index:20; border:2px solid #fef08a; display:flex; align-items:center; gap:8px; transition:transform 0.2s, background 0.2s; }
+#stamp-hud-btn:hover { transform:scale(1.05); }
+
+/* 左下 タッチ操作用 移動Dパッド */
+#dpad { position:absolute; bottom:20px; left:20px; width:130px; height:130px; z-index:50; display:grid; grid-template-columns:repeat(3, 1fr); grid-template-rows:repeat(3, 1fr); gap:5px; opacity:0.9; }
+.dpad-btn { background:rgba(15, 23, 42, 0.88); color:#38bdf8; border:2px solid #38bdf8; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:bold; user-select:none; touch-action:none; box-shadow:0 4px 10px rgba(0,0,0,0.4); backdrop-filter:blur(4px); transition:background 0.1s, transform 0.1s; }
+.dpad-btn:active, .dpad-btn.active { background:#38bdf8; color:#0f172a; transform:scale(0.92); }
+#dpad-up    { grid-column:2; grid-row:1; }
+#dpad-left  { grid-column:1; grid-row:2; }
+#dpad-right { grid-column:3; grid-row:2; }
+#dpad-down  { grid-column:2; grid-row:3; }
+
+/* クイズUI (4択) */
+#quiz-overlay { position:absolute; bottom:10%; left:50%; transform:translateX(-50%); background:rgba(15, 23, 42, 0.95); color:#fff; padding:20px; border-radius:20px; border:2px solid #38bdf8; text-align:center; display:none; box-shadow:0 10px 30px rgba(0,0,0,0.6); z-index:100; width:90%; max-width:520px; backdrop-filter:blur(8px); }
+#quiz-options { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:16px; }
+.quiz-opt-btn { background:#1e293b; color:#f8fafc; border:2px solid #475569; padding:12px 10px; font-size:14px; font-weight:bold; border-radius:12px; cursor:pointer; transition:all 0.15s ease-in-out; text-align:center; }
+.quiz-opt-btn:hover { background:#3b82f6; border-color:#93c5fd; transform:translateY(-2px); }
+.quiz-opt-btn:active { transform:scale(0.96); }
+
+/* 花丸スタンプ・結果アニメーション */
+#stamp-modal { position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:#fffef0; color:#1e293b; padding:24px; border-radius:24px; border:4px solid #f59e0b; box-shadow:0 12px 40px rgba(0,0,0,0.7); z-index:250; display:none; width:90%; max-width:440px; text-align:center; }
+.stamp-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin:16px 0; }
+.stamp-slot { width:100%; aspect-ratio:1; background:#fef3c7; border:2px dashed #d97706; border-radius:14px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:11px; color:#b45309; font-weight:bold; position:relative; }
+.stamp-mark { font-size:36px; color:#dc2626; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%) scale(0.1) rotate(-15deg); opacity:0; transition:all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); text-shadow:0 2px 6px rgba(220,38,38,0.3); }
+.stamp-mark.stamped { transform:translate(-50%, -50%) scale(1) rotate(-10deg); opacity:1; }
+
+/* 博士雑学UI */
+#hakase-overlay { position:absolute; top:15%; left:50%; transform:translateX(-50%); background:rgba(20,30,48,0.95); color:#fff; padding:20px; border-radius:16px; border:2px solid #f1c40f; text-align:center; display:none; box-shadow:0 4px 20px rgba(0,0,0,0.6); z-index:150; width:85%; max-width:420px; backdrop-filter:blur(6px); }
+#hakase-overlay button { margin-top:15px; padding:10px 24px; background:#f1c40f; color:#111; border:none; border-radius:10px; font-weight:bold; font-size:16px; cursor:pointer; }
+
+/* ガイダンスUI */
+#guidance-overlay { position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(15, 23, 42, 0.96); color:#fff; padding:24px; border-radius:20px; border:3px solid #38bdf8; text-align:center; box-shadow:0 10px 35px rgba(0,0,0,0.8); z-index:300; width:90%; max-width:500px; backdrop-filter:blur(10px); }
+#guidance-chara { font-size:52px; margin-bottom:4px; animation: bounce 1.5s infinite alternate; }
+@keyframes bounce { 0% { transform: translateY(0); } 100% { transform: translateY(-8px); } }
+
+/* ステージクリア・全体クリア画面 */
+#stage-clear-modal { position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(15, 23, 42, 0.96); color:#fff; padding:28px; border-radius:24px; border:3px solid #f59e0b; text-align:center; display:none; box-shadow:0 12px 40px rgba(0,0,0,0.8); z-index:350; width:90%; max-width:460px; backdrop-filter:blur(10px); }
+#clear-overlay { position:absolute; top:0; left:0; width:100vw; height:100vh; background:rgba(15, 23, 42, 0.92); color:#fff; display:none; flex-direction:column; align-items:center; justify-content:center; z-index:400; backdrop-filter:blur(12px); text-align:center; padding:20px; }
+
+#result-display { position:absolute; top:40%; left:50%; transform:translate(-50%,-50%); font-size:160px; font-weight:bold; z-index:200; display:none; pointer-events:none; }
+.correct { color:#ef4444; text-shadow:0 0 25px rgba(239,68,68,0.8); }
+.incorrect { color:#3b82f6; text-shadow:0 0 25px rgba(59,130,246,0.8); }
+
+.touch-hint { position:absolute; bottom:20px; right:20px; background:rgba(15,23,42,0.85); color:#fff; padding:10px 18px; border-radius:30px; font-size:12px; border:1px solid #38bdf8; pointer-events:none; z-index:10; }
+</style>
+</head>
+<body>
+
+<!-- ミニマップキャンバス -->
+<canvas id="map"></canvas>
+
+<!-- 案内情報 -->
+<div id="info">
+  <h3>🏫 <span id="info-title-stage">ステージ1：学校編</span> <span class="stage-badge" id="info-badge">STAGE 1</span></h3>
+  <div id="info-desc">校舎を探検して、教室の黒板クイズに答えよう！</div>
+  <div style="margin-top:2px; color:#d97706; font-weight:bold;" id="info-sub">💮 花丸スタンプ 8個を集めよう！</div>
+</div>
+
+<!-- スタンプカードHUDボタン -->
+<div id="stamp-hud-btn" onclick="openStampModal()">
+  <span style="font-size:20px;">💮</span>
+  <span>スタンプ (<span id="stamp-count-hud">0</span>/8)</span>
+</div>
+
+<!-- 左下 タッチ操作移動用Dパッド -->
+<div id="dpad">
+  <div id="dpad-up" class="dpad-btn">▲</div>
+  <div id="dpad-left" class="dpad-btn">◀</div>
+  <div id="dpad-right" class="dpad-btn">▶</div>
+  <div id="dpad-down" class="dpad-btn">▼</div>
+</div>
+
+<div class="touch-hint">👈 画面左右ドラッグで視点移動 / 左下で移動</div>
+
+<!-- 初回ガイダンス画面 -->
+<div id="guidance-overlay">
+  <div id="guidance-chara">🏫 🎓 🦁</div>
+  <div style="font-size:22px; font-weight:bold; color:#38bdf8; margin-bottom:8px;">歴史クイズアドベンチャーへようこそ！</div>
+  <div style="font-size:14px; line-height:1.6; margin-bottom:14px; background:rgba(255,255,255,0.08); padding:12px; border-radius:12px; text-align:left;">
+    <b>【小６歴史：縄文〜江戸時代問題（全3ステージ全24問）】</b><br>
+    ・<b>【第1ステージ：学校編】</b>: 8つの教室で歴史クイズに答えてスタンプを8個集めよう！<br>
+    ・<b>【第2ステージ：商店街編】</b>: 町の人々に話しかけて歴史4択クイズに答えよう！<br>
+    ・<b>【第3ステージ：サファリ・アニマルパーク編】</b>: パークにいる8体の動物に話しかけて歴史クイズに挑戦しよう！
+    
+    <div style="background:rgba(56, 189, 248, 0.15); border-left:4px solid #38bdf8; padding:8px 12px; margin-top:10px; border-radius:4px; font-size:13px;">
+      <b>💻 操作方法:</b><br>
+      ・<b>W / S (↑ / ↓)</b> または <b>画面左下の▲/▼</b>: 前進 / 後退<br>
+      ・<b>A / D (← / →)</b> または <b>画面左下の◀/▶</b>: 左移動 / 右移動<br>
+      ・<b>画面左右ドラッグ</b>: 視点回転
+    </div>
+  </div>
+  <button onclick="closeGuidanceUI()" style="padding:12px 32px; font-size:18px; background:#22c55e; color:white; border:none; border-radius:30px; font-weight:bold; cursor:pointer; box-shadow:0 4px 15px rgba(34,197,94,0.4);">
+    ステージ1（学校）スタート！
+  </button>
+</div>
+
+<!-- クイズUI (4択) -->
+<div id="quiz-overlay">
+  <div style="font-size:15px; color:#38bdf8; font-weight:bold; margin-bottom:6px;" id="quiz-room-title">第 1 教室</div>
+  <div id="quiz-question" style="font-size:17px; font-weight:bold; min-height:48px; display:flex; align-items:center; justify-content:center;">問題</div>
+  <div id="quiz-options"></div>
+</div>
+
+<!-- スタンプ帳 モーダル -->
+<div id="stamp-modal">
+  <div style="font-size:22px; font-weight:bold; color:#b45309;" id="modal-title">💮 花丸スタンプカード（学校）</div>
+  <div style="font-size:13px; color:#78350f; margin-bottom:6px;" id="modal-sub">8つのクイズに答えてスタンプを集めよう！</div>
+  
+  <div class="stamp-grid" id="stamp-grid-container"></div>
+
+  <div style="font-size:14px; font-weight:bold; color:#d97706; margin-bottom:12px;">
+    集めたスタンプ: <span id="modal-stamp-count">0</span> / 8 個
+  </div>
+
+  <button onclick="closeStampModal()" style="padding:8px 24px; background:#f59e0b; color:#fff; font-weight:bold; border:none; border-radius:20px; font-size:15px; cursor:pointer; box-shadow:0 3px 8px rgba(0,0,0,0.2);">
+    閉じる
+  </button>
+</div>
+
+<!-- ステージクリアモーダル -->
+<div id="stage-clear-modal">
+  <div style="font-size:56px; margin-bottom:6px;" id="stage-clear-icon">🏫💮🎉</div>
+  <div style="font-size:24px; font-weight:bold; color:#fef08a; margin-bottom:8px;" id="stage-clear-title">ステージ1クリア！</div>
+  <div style="font-size:14px; line-height:1.6; color:#e2e8f0; margin-bottom:18px;" id="stage-clear-desc">
+    学校の歴史クイズ8問を全て制覇しました！<br>
+    次は<b>「第2ステージ：商店街編」</b>に挑戦しよう！
+  </div>
+  <button id="stage-clear-btn" onclick="nextStageAction()" style="padding:12px 32px; font-size:18px; background:linear-gradient(135deg, #0284c7, #0369a1); color:white; border:none; border-radius:30px; font-weight:bold; cursor:pointer; box-shadow:0 4px 15px rgba(2,132,199,0.5);">
+    次へ進む！ 🏘️
+  </button>
+</div>
+
+<!-- 博士雑学画面 -->
+<div id="hakase-overlay">
+  <div style="color:#f1c40f;font-weight:bold;margin-bottom:8px;font-size:18px;">🎓 博士の雑学コーナー</div>
+  <div id="hakase-text" style="font-size:15px; line-height:1.5;">...</div>
+  <button onclick="closeHakaseUI()">閉じる</button>
+</div>
+
+<!-- 正解・不正解まるばつ表示 -->
+<div id="result-display">〇</div>
+
+<!-- 全クリア達成画面 -->
+<div id="clear-overlay">
+  <div style="font-size:80px; margin-bottom:10px;">🏆💮🏫🏘️🦁</div>
+  <div style="font-size:32px; font-weight:bold; color:#fef08a; text-shadow:0 0 20px rgba(250,204,21,0.6);">全3ステージコンプリート！</div>
+  <div style="font-size:16px; color:#e2e8f0; max-width:460px; margin:16px 0; line-height:1.6;">
+    素晴らしい！学校・商店街・アニマルパークの全24問の歴史クイズを完璧にクリアしました！<br>
+    君は真の歴史マスター＆動物博士です！
+  </div>
+  <button onclick="location.reload()" style="margin-top:10px; padding:14px 36px; background:linear-gradient(135deg, #ef4444, #dc2626); color:#fff; font-size:20px; font-weight:bold; border:none; border-radius:30px; cursor:pointer; box-shadow:0 6px 20px rgba(239,68,68,0.5);">
+    もう一度挑戦する（問題が変わるよ！）
+  </button>
+</div>
+
+<script src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'></script>
+<script>
+
+// --- 小6歴史（縄文～江戸時代）問題バンク（全50問） ---
+const historyQuizBank = [
+  { q: "縄文時代に使われていた、表面に縄目のような模様がある土器は何？", options: ["縄文土器", "弥生土器", "土師器", "須恵器"], a: 0 },
+  { q: "縄文時代に作られた、魔よけや恵みを祈るための土の人形は何？", options: ["土偶", "埴輪", "木偶", "銅鐸"], a: 0 },
+  { q: "弥生時代に大陸から伝わり、人々の生活を大きく変えた穀物の栽培は何？", options: ["米づくり（稲作）", "小麦づくり", "大豆づくり", "トウモロコシ栽培"], a: 0 },
+  { q: "弥生時代に作られた薄くて硬い土器を何という？", options: ["弥生土器", "縄文土器", "土師器", "陶器"], a: 0 },
+  { q: "邪馬台国の女王で、中国の魏に使いを送って金印をもらったとされる人物は？", options: ["卑弥呼", "持統天皇", "推古天皇", "額田王"], a: 0 },
+  { q: "豪族のお墓として造られた、鍵穴のような形をしている大きな古墳は何？", options: ["前方後円墳", "円墳", "方墳", "貝塚"], a: 0 },
+  { q: "古墳の周りや上に並べられた、土で作られた人物や馬の形の模型は何？", options: ["埴輪", "土偶", "銅鐸", "石仏"], a: 0 },
+  { q: "聖徳太子が定めた、家柄にとらわれず能力の高い人を役人にする制度は何？", options: ["冠位十二階", "十七条の憲法", "公地公民", "班田収授法"], a: 0 },
+  { q: "聖徳太子が和の心を大切にするために役人の心得として作ったものは何？", options: ["十七条の憲法", "冠位十二階", "大宝律令", "御成敗式目"], a: 0 },
+  { q: "聖徳太子が中国の隋に派遣した遣隋使の代表的な人物は誰？", options: ["小野妹子", "阿倍仲麻呂", "鑑真", "吉備真備"], a: 0 },
+  { q: "現存する世界最古の木造建築物とされる、聖徳太子ゆかりの寺院は何？", options: ["法隆寺", "東大寺", "金閣寺", "清水寺"], a: 0 },
+  { q: "645年、中大兄皇子と中臣鎌足らが蘇我氏をたおして始めた政治の改革は何？", options: ["大化の改新", "承久の乱", "建武の新政", "明治維新"], a: 0 },
+  { q: "大化の改新の後、天智天皇となった人物は誰？", options: ["中大兄皇子", "大海人皇子", "聖徳太子", "聖武天皇"], a: 0 },
+  { q: "710年に奈良に作られた、碁盤の目のように整えられた都は何？", options: ["平城京", "平安京", "長岡京", "藤原京"], a: 0 },
+  { q: "奈良時代に、仏教の力で国を守ろうとして東大寺に大仏を建てた天皇は誰？", options: ["聖武天皇", "桓武天皇", "推古天皇", "明治天皇"], a: 0 },
+  { q: "東大寺にある、聖武天皇の遺品などが納められた高床倉庫の建造物は何？", options: ["正倉院", "鳳凰堂", "三仏堂", "金色堂"], a: 0 },
+  { q: "唐（中国）から何度も苦難を乗り越えて日本に来て、正しい仏教を広めた僧は誰？", options: ["鑑真", "空海", "最澄", "行基"], a: 0 },
+  { q: "日本最古の歌集で、防人や庶民の歌も収められているものは何？", options: ["万葉集", "古今和歌集", "新古今和歌集", "百人一首"], a: 0 },
+  { q: "794年、桓武天皇によって京都に移された都は何？", options: ["平安京", "平城京", "長岡京", "鎌倉"], a: 0 },
+  { q: "平安時代に、娘を天皇のきさきにして大きな権力を握った藤原氏の政治は何？", options: ["摂関政治", "院政", "幕府政治", "親政"], a: 0 },
+  { q: "「この世をば わが世とぞ思う...」と歌を詠んだ、藤原氏全盛期の人物は誰？", options: ["藤原道長", "藤原頼通", "藤原清衡", "藤原不比等"], a: 0 },
+  { q: "藤原頼通が宇治に建てた、極楽浄土を表した美しい阿弥陀堂は何？", options: ["平等院鳳凰堂", "中尊寺金色堂", "東大寺大仏殿", "鹿苑寺金閣"], a: 0 },
+  { q: "平安時代に漢字をくずして作られ、紫式部らの文学に用いられた文字は何？", options: ["仮名文字（ひらがな・カタカナ）", "絵文字", "ローマ字", "ハングル"], a: 0 },
+  { q: "『源氏物語』を書いた平安時代の女性作家は誰？", options: ["紫式部", "清少納言", "菅原孝標女", "和泉式部"], a: 0 },
+  { q: "随筆『枕草子』を書き、「春はあけぼの...」で有名な女性作家は誰？", options: ["清少納言", "紫式部", "小野小町", "樋口一葉"], a: 0 },
+  { q: "武士として初めて太政大臣になり、平氏の全盛期を築いた人物は誰？", options: ["平清盛", "源頼朝", "源義経", "平将門"], a: 0 },
+  { q: "1192年、鎌倉に幕府を開いて武家政治を始めた人物は誰？", options: ["源頼朝", "源義経", "平清盛", "北条時政"], a: 0 },
+  { q: "鎌倉幕府で、御家人に対して土地の支配を認め、代わりに奉公させる関係を何という？", options: ["御恩と奉公", "公地公民", "身分制", "班田収授"], a: 0 },
+  { q: "源頼朝の妻で、頼朝の死後に「尼将軍」として幕府を支えた人物は誰？", options: ["北条政子", "日野富子", "濃姫", "春日局"], a: 0 },
+  { q: "13世紀、2度にわたって日本に押し寄せてきたモンゴル帝国の襲来を何という？", options: ["元寇（蒙古襲来）", "応仁の乱", "白村江の戦い", "刀狩"], a: 0 },
+  { q: "鎌倉幕府を倒し、一時期「建武の新政」と呼ばれる天皇中心の政治を行った天皇は？", options: ["後醍醐天皇", "後鳥羽上皇", "聖武天皇", "桓武天皇"], a: 0 },
+  { q: "京都の室町に幕府を開き、室町幕府の初代将軍となった人物は誰？", options: ["足利尊氏", "足利義満", "足利義政", "織田信長"], a: 0 },
+  { q: "室町幕府の第3代将軍で、北山に金閣（鹿苑寺）を建てた人物は誰？", options: ["足利義満", "足利尊氏", "足利義政", "北条時宗"], a: 0 },
+  { q: "東山に銀閣（慈照寺）を建て、書院造などの文化を広めた室町幕府第8代将軍は誰？", options: ["足利義政", "足利義満", "足利尊氏", "足利義昭"], a: 0 },
+  { q: "1467年に始まり、約11年間続いて戦国時代のきっかけとなった京都の戦いは何？", options: ["応仁の乱", "関ヶ原の戦い", "長篠の戦い", "承久の乱"], a: 0 },
+  { q: "1543年、日本の種子島に漂着したポルトガル人によって伝わった兵器は何？", options: ["鉄砲", "大砲", "日本刀", "弓矢"], a: 0 },
+  { q: "1549年、日本に初めてキリスト教を伝えたフランシスコ・ザビエルはどこの国の人？", options: ["スペイン（イエズス会）", "イギリス", "オランダ", "アメリカ"], a: 0 },
+  { q: "鉄砲を取り入れた戦術で武田軍を破り、天下統一を目指した戦国武将は誰？", options: ["織田信長", "豊臣秀吉", "徳川家康", "武田信玄"], a: 0 },
+  { q: "織田信長が明智光秀に襲われて倒れた京都の寺院は何？", options: ["本能寺", "延暦寺", "東大寺", "東福寺"], a: 0 },
+  { q: "全国の農民から武器を取り上げて一揆を防ぎ、農民と武士を区別した豊臣秀吉の政策は何？", options: ["刀狩", "太閤検地", "生類憐みの令", "楽市楽座"], a: 0 },
+  { q: "豊臣秀吉が全国の田畑の広さやとれる米の量を調べた政策は何？", options: ["太閤検地", "刀狩", "地租改正", "検地帳"], a: 0 },
+  { q: "1600年、徳川家康が石田三成らを破り、「天下分け目の戦い」と呼ばれた合戦は何？", options: ["関ヶ原の戦い", "長篠の戦い", "川中島の戦い", "壇ノ浦の戦い"], a: 0 },
+  { q: "1603年、徳川家康が征夷大将軍となって開いた幕府は何？", options: ["江戸幕府", "鎌倉幕府", "室町幕府", "足利幕府"], a: 0 },
+  { q: "江戸幕府が受入窓口（出島）を制限し、外国との交際や貿易を厳しく制限した政策は何？", options: ["鎖国", "開国", "参勤交代", "禁中並公家諸法度"], a: 0 },
+  { q: "江戸時代、鎖国の下で外国（オランダ・中国）との貿易窓口となった長崎の人工島は何？", options: ["出島", "佐渡", "厳島", "種子島"], a: 0 },
+  { q: "大名に1年おきに江戸と領地を行き来させ、出費を増やして力を抑えた制度は何？", options: ["参勤交代", "武家諸法度", "安政の大獄", "関所"], a: 0 },
+  { q: "江戸時代、幕府が農民や町人にキリスト教徒でないことを証明させるために行わせたものは何？", options: ["踏絵（絵踏）", "刀狩", "人別改め", "宗門改"], a: 0 },
+  { q: "江戸時代、日本の正確な沿岸図（日本地図）を歩いて測量して作った人物は誰？", options: ["伊能忠敬", "杉田玄白", "本居宣長", "平賀源内"], a: 0 },
+  { q: "オランダ語の医学書『ターヘル・アナトミア』を翻訳して『解体新書』を出版した人物は誰？", options: ["杉田玄白（前野良沢ら）", "伊能忠敬", "華岡青洲", "緒方洪庵"], a: 0 },
+  { q: "江戸時代の町人文化で発展した、歌舞伎や浮世絵の代表的な画家で『富嶽三十六景』を描いた人物は？", options: ["葛飾北斎", "菱川師宣", "歌川広重", "尾形光琳"], a: 0 }
+];
+
+// --- 0. ランダムシャッフル関数 ---
+function shuffleArray(array) {
+  let arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// ステージ1・2・3のクイズ割り当て用配列
+let stage1QuizData = [];
+let stage2QuizData = [];
+let stage3QuizData = [];
+
+function setupRandomQuizzes() {
+  const shuffled = shuffleArray(historyQuizBank);
+  
+  // 教室・NPC・動物の配置位置の定義
+  const stage1Locations = [
+    { roomName: "1階 1号室（歴史クイズ1）", cx: -30, cz: 15,  cy: 0 },
+    { roomName: "1階 2号室（歴史クイズ2）", cx: 30,  cz: 15,  cy: 0 },
+    { roomName: "1階 3号室（歴史クイズ3）", cx: -30, cz: -25, cy: 0 },
+    { roomName: "1階 4号室（歴史クイズ4）", cx: 30,  cz: -25, cy: 0 },
+    { roomName: "2階 1号室（歴史クイズ5）", cx: -30, cz: 15,  cy: 5.5 },
+    { roomName: "2階 2号室（歴史クイズ6）", cx: 30,  cz: 15,  cy: 5.5 },
+    { roomName: "2階 3号室（歴史クイズ7）", cx: -30, cz: -25, cy: 5.5 },
+    { roomName: "2階 4号室（歴史クイズ8）", cx: 30,  cz: -25, cy: 5.5 }
+  ];
+
+  const stage2Locations = [
+    { roomName: "コンビニ前の店員さん", cx: -5.2, cz: 45,  cy: 0 },
+    { roomName: "カフェ前のマスター",   cx: 5.2,  cz: 45,  cy: 0 },
+    { roomName: "和菓子屋前の店主",     cx: -5.2, cz: 67,  cy: 0 },
+    { roomName: "ゲームセンター前の店員", cx: 5.2, cz: 67, cy: 0 },
+    { roomName: "青柳菓子舗前の店主",    cx: -5.2, cz: 89,  cy: 0 },
+    { roomName: "ブティック前の店員", cx: 5.2,  cz: 89,  cy: 0 },
+    { roomName: "お茶屋前のご主人",       cx: -5.2, cz: 111, cy: 0 },
+    { roomName: "案内所前のおじさん",     cx: 5.2,  cz: 111, cy: 0 }
+  ];
+
+  const stage3Locations = [
+    { roomName: "ライオン 🦁", type: "lion",     cx: -18, cz: 165, cy: 0 },
+    { roomName: "ゾウ 🐘",     type: "elephant", cx: 18,  cz: 165, cy: 0 },
+    { roomName: "キリン 🦒",   type: "giraffe",  cx: -20, cz: 190, cy: 0 },
+    { roomName: "パンダ 🐼",   type: "panda",    cx: 20,  cz: 190, cy: 0 },
+    { roomName: "ペンギン 🐧", type: "penguin",  cx: -12, cz: 215, cy: 0 },
+    { roomName: "ゴリラ 🦍",   type: "gorilla",  cx: 12,  cz: 215, cy: 0 },
+    { roomName: "ウサギ 🐰",   type: "rabbit",   cx: -18, cz: 235, cy: 0 },
+    { roomName: "カンガルー 🦘",type: "kangaroo", cx: 18,  cz: 235, cy: 0 }
+  ];
+
+  stage1QuizData = [];
+  for (let i = 0; i < 8; i++) {
+    stage1QuizData.push({
+      id: i,
+      roomName: stage1Locations[i].roomName,
+      cx: stage1Locations[i].cx, cz: stage1Locations[i].cz, cy: stage1Locations[i].cy,
+      q: shuffled[i].q, options: shuffled[i].options, a: shuffled[i].a
+    });
+  }
+
+  stage2QuizData = [];
+  for (let i = 0; i < 8; i++) {
+    stage2QuizData.push({
+      id: i,
+      roomName: stage2Locations[i].roomName,
+      cx: stage2Locations[i].cx, cz: stage2Locations[i].cz, cy: stage2Locations[i].cy,
+      q: shuffled[i + 8].q, options: shuffled[i + 8].options, a: shuffled[i + 8].a
+    });
+  }
+
+  stage3QuizData = [];
+  for (let i = 0; i < 8; i++) {
+    stage3QuizData.push({
+      id: i,
+      roomName: stage3Locations[i].roomName,
+      type: stage3Locations[i].type,
+      cx: stage3Locations[i].cx, cz: stage3Locations[i].cz, cy: stage3Locations[i].cy,
+      q: shuffled[i + 16].q, options: shuffled[i + 16].options, a: shuffled[i + 16].a
+    });
+  }
+}
+
+// 初回問題ランダム抽出
+setupRandomQuizzes();
+
+// --- 現在のステージ情報 (1: 学校, 2: 商店街, 3: アニマルパーク) ---
+let currentStage = 1;
+
+// --- 1. サウンド制御 ---
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+
+function initAudio() {
+  if (!audioCtx) audioCtx = new AudioContext();
+}
+
+function playCorrectSound() {
+  initAudio();
+  const now = audioCtx.currentTime;
+  const osc1 = audioCtx.createOscillator();
+  const gain1 = audioCtx.createGain();
+  osc1.type = 'sine'; osc1.frequency.setValueAtTime(659.25, now);
+  gain1.gain.setValueAtTime(0.3, now); gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+  osc1.connect(gain1); gain1.connect(audioCtx.destination);
+  osc1.start(now); osc1.stop(now + 0.4);
+
+  const osc2 = audioCtx.createOscillator();
+  const gain2 = audioCtx.createGain();
+  osc2.type = 'sine'; osc2.frequency.setValueAtTime(1046.5, now + 0.15);
+  gain2.gain.setValueAtTime(0.3, now + 0.15); gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.7);
+  osc2.connect(gain2); gain2.connect(audioCtx.destination);
+  osc2.start(now + 0.15); osc2.stop(now + 0.7);
+}
+
+function playIncorrectSound() {
+  initAudio();
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sawtooth'; osc.frequency.setValueAtTime(130, now);
+  gain.gain.setValueAtTime(0.3, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(now); osc.stop(now + 0.5);
+}
+
+function playClearFanfare() {
+  initAudio();
+  const now = audioCtx.currentTime;
+  const freqs = [523.25, 659.25, 783.99, 1046.50];
+  freqs.forEach((f, idx) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle'; osc.frequency.setValueAtTime(f, now + idx * 0.12);
+    gain.gain.setValueAtTime(0.35, now + idx * 0.12); gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.8);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(now + idx * 0.12); osc.stop(now + idx * 0.12 + 0.8);
+  });
+}
+
+function playExclamationSound() {
+  initAudio();
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'triangle'; osc.frequency.setValueAtTime(440, now);
+  osc.frequency.exponentialRampToValueAtTime(880, now + 0.15);
+  gain.gain.setValueAtTime(0.3, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(now); osc.stop(now + 0.25);
+}
+
+function speakText(text, pitch = 1.0, rate = 1.0, onEndCallback = null) {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+    const uttr = new SpeechSynthesisUtterance(text);
+    uttr.lang = 'ja-JP'; uttr.pitch = pitch; uttr.rate = rate;
+    if(onEndCallback) uttr.onend = onEndCallback;
+    window.speechSynthesis.speak(uttr);
+  } else if(onEndCallback) {
+    setTimeout(onEndCallback, 3000);
+  }
+}
+
+
+// --- 2. Three.js シーン構造初期化 ---
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xbae6fd); 
+scene.fog = new THREE.FogExp2(0xbae6fd, 0.003);
+
+const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true; 
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; 
+renderer.toneMappingExposure = 1.15; 
+document.body.appendChild(renderer.domElement);
+
+// 初期プレイヤー位置：1面は学校広場からスタート
+const playerPos = new THREE.Vector3(0, 1.7, 18);
+let targetYaw = 0; 
+let currentYaw = 0;
+
+camera.position.copy(playerPos);
+camera.rotation.order = 'YXZ';
+
+// ライティング
+scene.add(new THREE.AmbientLight(0xffffff, 0.85)); 
+let sunLight = new THREE.DirectionalLight(0xfffdf0, 0.9);
+sunLight.position.set(-40, 80, 40);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
+scene.add(sunLight);
+
+
+// --- 3. テクスチャ生成関数 ---
+function createRoadTexture() {
+  const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#94a3b8'; ctx.fillRect(0,0,512,512);
+  ctx.fillStyle = '#64748b'; for(let y=0; y<512; y+=32) { ctx.fillRect(0, y, 512, 2); }
+  ctx.fillStyle = '#cbd5e0'; ctx.fillRect(0,0,70,512); ctx.fillRect(442,0,70,512);
+  ctx.fillStyle = '#f59e0b'; ctx.fillRect(52,0,12,512); ctx.fillRect(448,0,12,512);
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createBrickTexture() {
+  const canvas = document.createElement('canvas'); canvas.width = 128; canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#cc7766'; ctx.fillRect(0,0,128,128);
+  ctx.fillStyle = '#bb6655'; for(let y=0; y<128; y+=16) { ctx.fillRect(0, y, 128, 2); }
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createJapaneseWallTexture() {
+  const canvas = document.createElement('canvas'); canvas.width = 128; canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#f3e8d4'; ctx.fillRect(0,0,128,128);
+  ctx.fillStyle = '#5c4033'; ctx.fillRect(0, 0, 8, 128); ctx.fillRect(120, 0, 8, 128);
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createKawaraTexture() {
+  const canvas = document.createElement('canvas'); canvas.width = 128; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#4a5568'; ctx.fillRect(0,0,128,64);
+  ctx.fillStyle = '#2d3748'; for(let x=0; x<128; x+=16) { ctx.fillRect(x, 0, 3, 64); }
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createStoreFrontATexture() {
+  const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256; const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#1e293b'; ctx.fillRect(0,0,256,256); ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 8; ctx.strokeRect(0,0,256,256);
+  for(let h=40; h<240; h+=40) {
+    ctx.fillStyle = '#e2e8f0'; ctx.fillRect(10, h, 236, 4);
+    for(let x=14; x<230; x+=12) { if(x>=115 && x<=135) continue; ctx.fillStyle = ['#ef4444','#22c55e','#3b82f6','#f59e0b','#ffffff'][Math.floor(Math.random()*5)]; ctx.fillRect(x, h-18, 8, 18); }
+  }
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createSignATexture() {
+  const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 64; const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,256,64); ctx.fillStyle = '#1e293b'; ctx.font = 'bold 20px monospace'; ctx.textAlign = 'center'; ctx.fillText('🏪 CONVENI MART', 128, 40);
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createStoreFrontBTexture() {
+  const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256; const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#f8fafc'; ctx.fillRect(0,0,256,256); ctx.fillStyle = '#0f172a'; ctx.fillRect(16, 40, 224, 180); ctx.strokeStyle = '#78350f'; ctx.lineWidth = 8; ctx.strokeRect(16, 40, 224, 180);
+  ctx.fillStyle = '#f59e0b'; ctx.beginPath(); ctx.arc(128, 75, 10, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#22c55e'; ctx.fillRect(36, 140, 20, 80); ctx.fillStyle = '#f472b6'; ctx.fillRect(170, 130, 24, 90);
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createSignBTexture() {
+  const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 64; const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#0f172a'; ctx.fillRect(0,0,256,64); ctx.fillStyle = '#fbbf24'; ctx.font = 'bold 20px serif'; ctx.textAlign = 'center'; ctx.fillText('☕ Cafe & Boutique 👗', 128, 40);
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createStoreFrontCTexture() {
+  const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256; const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#f3e8d4'; ctx.fillRect(0,0,256,256); ctx.fillStyle = '#2d1e18'; ctx.fillRect(20, 50, 216, 180); ctx.fillStyle = '#e2e8f0';
+  for(let x=26; x<230; x+=24) { ctx.fillRect(x, 56, 16, 168); ctx.fillStyle = '#2d1e18'; for(let y=60; y<220; y+=20) { ctx.fillRect(x, y, 16, 3); } ctx.fillStyle = '#e2e8f0'; }
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createSignCTexture() {
+  const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 64; const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#4a2f13'; ctx.fillRect(0,0,256,64); ctx.fillStyle = '#fde047'; ctx.font = 'bold 22px serif'; ctx.textAlign = 'center'; ctx.fillText('⛩️ 銘菓 お土産 処 🍵', 128, 42);
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createStoreFrontDTexture() {
+  const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256; const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#111116'; ctx.fillRect(0,0,256,256); ctx.strokeStyle = '#a855f7'; ctx.lineWidth = 8; ctx.strokeRect(0,0,256,256);
+  for(let i=0; i<15; i++){ ctx.fillStyle = ['#06b6d4','#ec4899','#22c55e','#eab308'][Math.floor(Math.random()*4)]; ctx.fillRect(20+Math.random()*200, 60+Math.random()*140, 16, 12); }
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createSignDTexture() {
+  const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 64; const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#1e293b'; ctx.fillRect(0,0,256,64); ctx.fillStyle = '#22d3ee'; ctx.font = 'bold 22px monospace'; ctx.textAlign = 'center'; ctx.fillText('🕹️ GAME CENTER 👾', 128, 38);
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createStoreFrontETexture() {
+  const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256; const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#e2d5bf'; ctx.fillRect(0,0,256,256);
+  ctx.strokeStyle = '#5a3d28'; ctx.lineWidth = 8; ctx.strokeRect(30, 40, 196, 216);
+  ctx.fillStyle = '#2d1e11'; ctx.fillRect(125, 40, 6, 216);
+  ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(38, 48, 85, 200); ctx.fillRect(133, 48, 85, 200);
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createSignETexture() {
+  const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 64; const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,256,64); ctx.strokeStyle = '#888'; ctx.lineWidth = 2; ctx.strokeRect(2,2,252,60);
+  ctx.fillStyle = '#111'; ctx.font = 'bold 15px serif'; ctx.fillText('御菓子', 14, 28); ctx.fillText('司', 108, 24); ctx.fillText('柳', 128, 46);
+  ctx.font = 'bold 18px serif'; ctx.fillText('青', 36, 48);
+  ctx.strokeStyle = '#16a34a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(86, 32, 11, 0, Math.PI*2); ctx.stroke();
+  ctx.fillStyle = '#16a34a'; ctx.font = 'bold 9px sans-serif'; ctx.fillText('青', 82, 35);
+  ctx.fillStyle = '#222'; ctx.font = 'bold 14px monospace'; ctx.fillText('☎ 21-5466', 165, 38);
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createVerticalSignEText() {
+  const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 256; const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,64,256); ctx.strokeStyle = '#333'; ctx.lineWidth = 4; ctx.strokeRect(0,0,64,256);
+  ctx.fillStyle = '#111'; ctx.font = 'bold 24px serif';
+  const text = "青柳菓子舗"; for(let i=0; i<5; i++) { ctx.fillText(text[i], 18, 45 + i*45); }
+  return new THREE.CanvasTexture(canvas);
+}
+
+const roadTex = createRoadTexture(); roadTex.wrapS = THREE.RepeatWrapping; roadTex.wrapT = THREE.RepeatWrapping; roadTex.repeat.set(1, 10);
+const brickTex = createBrickTexture(); brickTex.wrapS = THREE.RepeatWrapping; brickTex.wrapT = THREE.RepeatWrapping;
+const jpWallTex = createJapaneseWallTexture(); jpWallTex.wrapS = THREE.RepeatWrapping; jpWallTex.wrapT = THREE.RepeatWrapping;
+const kawaraTex = createKawaraTexture(); kawaraTex.wrapS = THREE.RepeatWrapping; kawaraTex.repeat.set(4,1);
+
+// マテリアル
+const wallMat   = new THREE.MeshStandardMaterial({color:0xdcd5cc, roughness:0.8}); 
+const floorMat  = new THREE.MeshStandardMaterial({color:0xd2ba9f, roughness:0.6}); 
+const floor2Mat = new THREE.MeshStandardMaterial({color:0xd2ba9f, roughness:0.6, side: THREE.DoubleSide}); 
+const deskMat   = new THREE.MeshStandardMaterial({color:0xb58f63, roughness:0.5}); 
+const pipeMat   = new THREE.MeshStandardMaterial({color:0x777777, roughness:0.4, metalness:0.5}); 
+
+
+// --- 4. 地面と校舎、商店街、サファリパークフィールド構築 ---
+
+// 学校敷地床
+let schoolFloor1 = new THREE.Mesh(new THREE.PlaneGeometry(100, 70), floorMat);
+schoolFloor1.rotation.x = -Math.PI / 2; schoolFloor1.position.set(0, 0, -5);
+schoolFloor1.receiveShadow = true; scene.add(schoolFloor1);
+
+let schoolFloor2 = new THREE.Mesh(new THREE.PlaneGeometry(80, 60), floor2Mat);
+schoolFloor2.rotation.x = -Math.PI / 2; schoolFloor2.position.set(0, 5.5, -5);
+schoolFloor2.receiveShadow = true; schoolFloor2.castShadow = true; scene.add(schoolFloor2);
+
+// 商店街道路床 (Z = 30 ～ 140)
+let townRoad = new THREE.Mesh(new THREE.PlaneGeometry(30, 110), new THREE.MeshStandardMaterial({ map: roadTex, roughness: 0.7 }));
+townRoad.rotation.x = -Math.PI / 2; townRoad.position.set(0, 0, 85);
+townRoad.receiveShadow = true; scene.add(townRoad);
+
+// 校門エリアと芝生庭
+let yardMat = new THREE.MeshStandardMaterial({color: 0x4ade80, roughness: 0.8});
+let yardL = new THREE.Mesh(new THREE.PlaneGeometry(35, 40), yardMat);
+yardL.rotation.x = -Math.PI / 2; yardL.position.set(-32.5, 0, 15); yardL.receiveShadow = true; scene.add(yardL);
+let yardR = yardL.clone(); yardR.position.x = 32.5; scene.add(yardR);
+
+// 校門ポール
+let gateMat = new THREE.MeshStandardMaterial({color: 0x854d0e, roughness: 0.6});
+let gateL = new THREE.Mesh(new THREE.BoxGeometry(1.2, 3.5, 1.2), gateMat); gateL.position.set(-6, 1.75, 30); gateL.castShadow = true; scene.add(gateL);
+let gateR = gateL.clone(); gateR.position.x = 6; scene.add(gateR);
+
+// --- 4b. 第3ステージ：サファリ・アニマルパーク フィールド (Z = 140 〜 250) ---
+let safariFloor = new THREE.Mesh(new THREE.PlaneGeometry(80, 110), new THREE.MeshStandardMaterial({ color: 0x86efac, roughness: 0.9 }));
+safariFloor.rotation.x = -Math.PI / 2; safariFloor.position.set(0, -0.01, 195);
+safariFloor.receiveShadow = true; scene.add(safariFloor);
+
+// アニマルパーク中央歩行通路
+let safariPath = new THREE.Mesh(new THREE.PlaneGeometry(12, 110), new THREE.MeshStandardMaterial({ color: 0xfef08a, roughness: 0.8 }));
+safariPath.rotation.x = -Math.PI / 2; safariPath.position.set(0, 0, 195);
+safariPath.receiveShadow = true; scene.add(safariPath);
+
+// パークアーチアーケードゲート (Z = 142)
+const parkGateGroup = new THREE.Group();
+parkGateGroup.position.set(0, 0, 142);
+let pGatePillarL = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.0, 7, 16), new THREE.MeshStandardMaterial({ color: 0xb45309 }));
+pGatePillarL.position.set(-7, 3.5, 0); pGatePillarL.castShadow = true;
+let pGatePillarR = pGatePillarL.clone(); pGatePillarR.position.x = 7;
+let pGateTop = new THREE.Mesh(new THREE.BoxGeometry(16, 1.8, 1.2), new THREE.MeshStandardMaterial({ color: 0x15803d }));
+pGateTop.position.set(0, 6.5, 0); pGateTop.castShadow = true;
+
+// パーク看板
+const parkSignCanvas = document.createElement('canvas'); parkSignCanvas.width = 512; parkSignCanvas.height = 128;
+const pskCtx = parkSignCanvas.getContext('2d');
+pskCtx.fillStyle = '#15803d'; pskCtx.fillRect(0,0,512,128); pskCtx.strokeStyle = '#fef08a'; pskCtx.lineWidth = 10; pskCtx.strokeRect(5,5,502,118);
+pskCtx.fillStyle = '#ffffff'; pskCtx.font = 'bold 38px sans-serif'; pskCtx.textAlign = 'center'; pskCtx.fillText('🦁 SAFARI ANIMAL PARK 🐘', 256, 75);
+const pskTex = new THREE.CanvasTexture(parkSignCanvas);
+let parkSignMesh = new THREE.Mesh(new THREE.PlaneGeometry(14, 1.6), new THREE.MeshBasicMaterial({ map: pskTex }));
+parkSignMesh.position.set(0, 6.5, 0.65);
+parkGateGroup.add(pGatePillarL, pGatePillarR, pGateTop, parkSignMesh);
+scene.add(parkGateGroup);
+
+// パーク装飾（木々・岩・水辺）
+function createTree(x, z) {
+  let treeGroup = new THREE.Group();
+  treeGroup.position.set(x, 0, z);
+  let trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, 3, 8), new THREE.MeshStandardMaterial({ color: 0x78350f }));
+  trunk.position.y = 1.5; trunk.castShadow = true;
+  let leaves = new THREE.Mesh(new THREE.ConeGeometry(2.2, 4.5, 8), new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.8 }));
+  leaves.position.y = 4.2; leaves.castShadow = true;
+  treeGroup.add(trunk, leaves);
+  scene.add(treeGroup);
+}
+
+// 散策路沿いに木を配置
+for (let z = 150; z <= 240; z += 18) {
+  createTree(-28, z); createTree(28, z);
+  createTree(-35, z + 9); createTree(35, z + 9);
+}
+
+// パーク内水線池（ペンギン用）
+let pondMesh = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 0.2, 24), new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.2, metalness: 0.1 }));
+pondMesh.position.set(-12, 0.05, 215); scene.add(pondMesh);
+
+
+// --- 5. 商店街の店舗設置ロジック ---
+function createShop(type, xPosition, zPosition, isLeftSide) {
+  const shopGroup = new THREE.Group();
+  const w = 12, h = 7, d = 10;
+  
+  let wallT = brickTex.clone();
+  let fTex = createStoreFrontATexture();
+  let sTex = createSignATexture();
+
+  if(type === 'A') { fTex = createStoreFrontATexture(); sTex = createSignATexture(); wallT = brickTex.clone(); }
+  if(type === 'B') { fTex = createStoreFrontBTexture(); sTex = createSignBTexture(); wallT = brickTex.clone(); }
+  if(type === 'C') { fTex = createStoreFrontCTexture(); sTex = createSignCTexture(); wallT = jpWallTex.clone(); }
+  if(type === 'D') { fTex = createStoreFrontDTexture(); sTex = createSignDTexture(); wallT = brickTex.clone(); }
+  if(type === 'E') { fTex = createStoreFrontETexture(); sTex = createSignETexture(); wallT = jpWallTex.clone(); }
+
+  wallT.repeat.set(2, 2);
+  const sideMat = new THREE.MeshStandardMaterial({ map: wallT, roughness: 0.6 });
+  const frontMat = new THREE.MeshStandardMaterial({ map: fTex, roughness: 0.2, emissive: new THREE.Color(0xffffff), emissiveMap: fTex, emissiveIntensity: 0.25 });
+
+  let materials = isLeftSide ? 
+      [frontMat, sideMat, sideMat, sideMat, sideMat, sideMat] : 
+      [sideMat, frontMat, sideMat, sideMat, sideMat, sideMat];
+
+  shopGroup.position.set(isLeftSide ? (xPosition - d/2) : (xPosition + d/2), 0, zPosition);
+
+  const baseMesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), materials);
+  baseMesh.position.y = h / 2; baseMesh.castShadow = true; baseMesh.receiveShadow = true;
+  shopGroup.add(baseMesh);
+
+  // 看板
+  const signFrontMat = new THREE.MeshStandardMaterial({ map: sTex, emissive: new THREE.Color(0xffffff), emissiveMap: sTex, emissiveIntensity: 0.15 });
+  let signMats = isLeftSide ? [signFrontMat, sideMat, sideMat, sideMat, sideMat, sideMat] : [sideMat, signFrontMat, sideMat, sideMat, sideMat, sideMat];
+  
+  const signMesh = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.4, w), signMats);
+  signMesh.position.set(isLeftSide ? (w/2 + 0.15) : -(w/2 + 0.15), h - 0.7, 0);
+  signMesh.castShadow = true;
+  shopGroup.add(signMesh);
+
+  const offsetDir = isLeftSide ? 1 : -1;
+
+  if(type === 'C') {
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.4, w + 0.4), new THREE.MeshStandardMaterial({ map: kawaraTex }));
+    roof.position.set(offsetDir * (w/2 + 0.8), h - 1.4, 0); shopGroup.add(roof);
+  } else if(type === 'E') {
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.4, w + 0.4), new THREE.MeshStandardMaterial({ map: kawaraTex }));
+    roof.position.set(offsetDir * (w/2 + 0.5), h - 0.2, 0); shopGroup.add(roof);
+    
+    const vSignMat = new THREE.MeshStandardMaterial({ map: createVerticalSignEText() });
+    const vSign = new THREE.Mesh(new THREE.BoxGeometry(0.1, 3.2, 0.8), isLeftSide ? [vSignMat, sideMat, sideMat, sideMat, sideMat, sideMat] : [sideMat, vSignMat, sideMat, sideMat, sideMat, sideMat]);
+    vSign.position.set(offsetDir * (w/2 + 0.25), 1.6, 3.8); shopGroup.add(vSign);
+  } else {
+    const tent = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.15, w + 0.2), new THREE.MeshStandardMaterial({ color: (type === 'A' ? 0x16a34a : 0xdc2626) }));
+    tent.position.set(offsetDir * (w/2 + 0.8), h - 1.5, 0); shopGroup.add(tent);
+  }
+
+  scene.add(shopGroup);
+}
+
+// 商店街店舗並べ配置 (左右両側)
+const shopTypes = ['A', 'B', 'C', 'D', 'E'];
+let typeIdx = 0;
+for (let z = 45; z <= 125; z += 22) {
+  createShop(shopTypes[typeIdx % 5], -13, z, true);
+  createShop(shopTypes[(typeIdx + 2) % 5], 13, z, false);
+  typeIdx++;
+}
+
+// 街路灯 & 街路樹
+for(let z = 40; z <= 130; z += 25) {
+  let lightGeo = new THREE.CylinderGeometry(0.08, 0.1, 4.5, 8);
+  let lightMat = new THREE.MeshStandardMaterial({color: 0x334155, metalness:0.6});
+  let lampL = new THREE.Mesh(lightGeo, lightMat); lampL.position.set(-11, 2.25, z); scene.add(lampL);
+  let lampR = lampL.clone(); lampR.position.x = 11; scene.add(lampR);
+
+  let bulbGeo = new THREE.SphereGeometry(0.3, 12, 12);
+  let bulbMat = new THREE.MeshBasicMaterial({color: 0xfef08a});
+  let bulbL = new THREE.Mesh(bulbGeo, bulbMat); bulbL.position.set(-11, 4.5, z); scene.add(bulbL);
+  let bulbR = bulbL.clone(); bulbR.position.x = 11; scene.add(bulbR);
+}
+
+
+// --- 6. クイズデータ & 教室・ステージの初期化 ---
+const humans = [];
+const classroomAreas = [];
+const allSeats = []; 
+const quizBoards = []; 
+const townQuizNPCs = []; // ステージ2 商店街クイズNPC
+const animalQuizNPCs = []; // ステージ3 アニマルパーククイズ動物NPC
+
+// 移動制限座標 (ステージごとに段階的に拡大)
+let xMin = -42, xMax = 42;
+let zMin = -35, zMax = 250;
+
+let activeQuiz = null;
+const stage1Stamps = new Array(8).fill(false);
+const stage2Stamps = new Array(8).fill(false);
+const stage3Stamps = new Array(8).fill(false);
+
+const triviaList = [
+  "キリンの首の骨の数は、人間と同じ７個なんじゃよ！",
+  "イチゴの表面にあるつぶつぶは、果実ではなく種子を包む果実なんじゃ！",
+  "バナナは実のところ、木ではなく巨大な草の実なんじゃよ。",
+  "フラミンゴがピンク色なのは、食べているエビや藻の成分のせいなんじゃ。",
+  "ナマケモノは満腹のまま餓死することがあるんじゃ。胃の中の物を消化するエネルギーすら湧かないからなんじゃな。"
+];
+
+function createBoardMaterials(roomName, questionText) {
+  const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#163d22'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = '#855e42'; ctx.lineWidth = 30; ctx.strokeRect(15, 15, canvas.width - 30, canvas.height - 30);
+  ctx.fillStyle = '#fef08a'; ctx.font = 'bold 36px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(`【 ${roomName} 】`, canvas.width / 2, canvas.height / 2 - 100);
+  
+  ctx.fillStyle = '#ffffff'; ctx.font = 'bold 38px sans-serif';
+  let words = questionText.split('');
+  let line = '';
+  let lines = [];
+  for(let n = 0; n < words.length; n++) {
+    let testLine = line + words[n];
+    let metrics = ctx.measureText(testLine);
+    if (metrics.width > 880 && n > 0) {
+      lines.push(line);
+      line = words[n];
+    } else {
+      line = testLine;
+    }
+  }
+  lines.push(line);
+
+  let startY = canvas.height / 2 + 10 - ((lines.length - 1) * 25);
+  for(let k = 0; k < lines.length; k++) {
+    ctx.fillText(lines[k], canvas.width / 2, startY + (k * 50));
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  
+  const frontMat = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.8 });
+  const backMat = new THREE.MeshStandardMaterial({ color: 0x163d22, roughness: 0.8 });
+  return [backMat, backMat, backMat, backMat, frontMat, backMat];
+}
+
+function createStairs() {
+  const stairGroup = new THREE.Group();
+  stairGroup.position.set(0, 0, -2); 
+  const steps = 24, totalHeight = 5.5, stairWidth = 5, totalDepth = 12;
+
+  for (let i = 0; i < steps; i++) {
+    let stepH = totalHeight / steps;
+    let geo = new THREE.BoxGeometry(stairWidth, stepH, totalDepth / steps);
+    let mesh = new THREE.Mesh(geo, deskMat);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    mesh.position.set(0, (i * stepH) + stepH/2, - (i * (totalDepth / steps)));
+    stairGroup.add(mesh);
+  }
+
+  let railGeo = new THREE.BoxGeometry(0.2, totalHeight + 1, totalDepth);
+  let railL = new THREE.Mesh(railGeo, wallMat);
+  railL.position.set(-stairWidth/2 - 0.1, totalHeight/2, -totalDepth/2);
+  let railR = railL.clone(); railR.position.x = stairWidth/2 + 0.1;
+  stairGroup.add(railL, railR);
+  scene.add(stairGroup);
+}
+createStairs();
+
+
+// --- 7. NPC人間・商店街クイズNPC・3D動物モデル生成 ---
+function createHakaseHat() {
+  const hatGroup = new THREE.Group();
+  const capMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5 });
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.25, 0.2, 16), capMat); base.position.y = 0.1; hatGroup.add(base);
+  const topPlate = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.03, 0.65), capMat); topPlate.position.y = 0.2; hatGroup.add(topPlate);
+  const tasselMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, roughness: 0.3 });
+  const tassel = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.03, 0.25, 8), tasselMat); tassel.position.set(0.25, 0.08, 0.25); hatGroup.add(tassel);
+  return hatGroup;
+}
+
+function createExclamationMark() {
+  const group = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color: 0xf1c40f });
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.45, 0.12), mat); bar.position.y = 0.3; group.add(bar);
+  const dot = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.12), mat); dot.position.y = -0.05; group.add(dot);
+  group.position.set(0, 3.2, 0); group.visible = false;
+  return group;
+}
+
+function createQuizMark(iconStr = '❓') {
+  const group = new THREE.Group();
+  const canvas = document.createElement('canvas'); canvas.width = 128; canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#0284c7'; ctx.beginPath(); ctx.arc(64, 64, 60, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 6; ctx.stroke();
+  ctx.fillStyle = '#ffffff'; ctx.font = 'bold 64px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(iconStr, 64, 68);
+  const tex = new THREE.CanvasTexture(canvas);
+  const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.scale.set(1.4, 1.4, 1);
+  sprite.position.set(0, 3.6, 0);
+  group.add(sprite);
+  return group;
+}
+
+// 3D動物モデリング生成関数 (配置場所から動かない)
+function createAnimalMesh(type) {
+  const animalGroup = new THREE.Group();
+
+  if (type === 'lion') {
+    // ライオン 🦁
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.0, 2.0), new THREE.MeshStandardMaterial({ color: 0xd97706 }));
+    body.position.y = 0.9; body.castShadow = true;
+    const mane = new THREE.Mesh(new THREE.SphereGeometry(0.85, 12, 12), new THREE.MeshStandardMaterial({ color: 0x78350f }));
+    mane.position.set(0, 1.6, 0.8); mane.castShadow = true;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.55, 12, 12), new THREE.MeshStandardMaterial({ color: 0xf59e0b }));
+    head.position.set(0, 1.6, 1.1); head.castShadow = true;
+    animalGroup.add(body, mane, head);
+  } else if (type === 'elephant') {
+    // ゾウ 🐘
+    const body = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.8, 3.2), new THREE.MeshStandardMaterial({ color: 0x64748b }));
+    body.position.y = 1.6; body.castShadow = true;
+    const head = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.3, 1.4), new THREE.MeshStandardMaterial({ color: 0x64748b }));
+    head.position.set(0, 2.2, 1.8); head.castShadow = true;
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.15, 1.8, 8), new THREE.MeshStandardMaterial({ color: 0x64748b }));
+    trunk.position.set(0, 1.3, 2.6); trunk.rotation.x = 0.4; trunk.castShadow = true;
+    const earL = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.2, 1.0), new THREE.MeshStandardMaterial({ color: 0x475569 }));
+    earL.position.set(-0.8, 2.3, 1.8); earL.castShadow = true;
+    const earR = earL.clone(); earR.position.x = 0.8;
+    animalGroup.add(body, head, trunk, earL, earR);
+  } else if (type === 'giraffe') {
+    // キリン 🦒
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 2.2), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
+    body.position.y = 1.4; body.castShadow = true;
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.45, 3.2, 8), new THREE.MeshStandardMaterial({ color: 0xeab308 }));
+    neck.position.set(0, 3.2, 0.9); neck.rotation.x = -0.2; neck.castShadow = true;
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.9), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
+    head.position.set(0, 4.6, 1.2); head.castShadow = true;
+    animalGroup.add(body, neck, head);
+  } else if (type === 'panda') {
+    // パンダ 🐼
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.8, 12, 12), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+    body.position.y = 0.8; body.castShadow = true;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 12), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+    head.position.set(0, 1.4, 0.3); head.castShadow = true;
+    const earL = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+    earL.position.set(-0.4, 1.9, 0.3); earL.castShadow = true;
+    const earR = earL.clone(); earR.position.x = 0.4;
+    const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.12, 0.05), new THREE.MeshBasicMaterial({ color: 0x111111 }));
+    eyeL.position.set(-0.2, 1.45, 0.82);
+    const eyeR = eyeL.clone(); eyeR.position.x = 0.2;
+    animalGroup.add(body, head, earL, earR, eyeL, eyeR);
+  } else if (type === 'penguin') {
+    // ペンギン 🐧
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 1.1, 12), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
+    body.position.y = 0.65; body.castShadow = true;
+    const belly = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.36, 0.9, 12), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+    belly.position.set(0, 0.6, 0.08); belly.castShadow = true;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 12), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
+    head.position.set(0, 1.25, 0); head.castShadow = true;
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.3, 8), new THREE.MeshStandardMaterial({ color: 0xf97316 }));
+    beak.rotation.x = Math.PI / 2; beak.position.set(0, 1.22, 0.38); beak.castShadow = true;
+    animalGroup.add(body, belly, head, beak);
+  } else if (type === 'gorilla') {
+    // ゴリラ 🦍
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.3, 1.0), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+    body.position.y = 0.9; body.castShadow = true;
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.65, 0.65), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
+    head.position.set(0, 1.6, 0.1); head.castShadow = true;
+    const armL = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.2, 0.4), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+    armL.position.set(-0.8, 0.8, 0.2); armL.rotation.z = -0.2; armL.castShadow = true;
+    const armR = armL.clone(); armR.position.x = 0.8; armR.rotation.z = 0.2;
+    animalGroup.add(body, head, armL, armR);
+  } else if (type === 'rabbit') {
+    // ウサギ 🐰
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.45, 10, 10), new THREE.MeshStandardMaterial({ color: 0xf8fafc }));
+    body.position.y = 0.45; body.castShadow = true;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 10), new THREE.MeshStandardMaterial({ color: 0xf8fafc }));
+    head.position.set(0, 0.8, 0.2); head.castShadow = true;
+    const earL = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.7, 8), new THREE.MeshStandardMaterial({ color: 0xf472b6 }));
+    earL.position.set(-0.15, 1.25, 0.2); earL.rotation.z = -0.15; earL.castShadow = true;
+    const earR = earL.clone(); earR.position.x = 0.15; earR.rotation.z = 0.15;
+    animalGroup.add(body, head, earL, earR);
+  } else {
+    // カンガルー 🦘
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 1.3, 10), new THREE.MeshStandardMaterial({ color: 0xd97706 }));
+    body.position.y = 0.85; body.castShadow = true;
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.4, 0.6), new THREE.MeshStandardMaterial({ color: 0xd97706 }));
+    head.position.set(0, 1.5, 0.2); head.castShadow = true;
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.2, 1.2, 8), new THREE.MeshStandardMaterial({ color: 0xd97706 }));
+    tail.position.set(0, 0.4, -0.6); tail.rotation.x = -0.6; tail.castShadow = true;
+    animalGroup.add(body, head, tail);
+  }
+
+  return animalGroup;
+}
+
+function createHuman(x, y, z, seated = false, seatRef = null, canWalk = true) {
+  let g = new THREE.Group();
+  let skinColor = 0xffc0a0;
+  let colors = [0x3b82f6, 0xf97316, 0x22c55e, 0xef4444, 0xa855f7];
+  
+  let isHakase = canWalk && (Math.random() < 0.12);
+  let clothesColor = isHakase ? 0x1e293b : colors[Math.floor(Math.random() * colors.length)];
+  
+  let pMat = new THREE.MeshStandardMaterial({color: clothesColor, roughness: 0.7});
+  let sMat = new THREE.MeshStandardMaterial({color: skinColor, roughness: 0.6});
+  let pantsMat = new THREE.MeshStandardMaterial({color: 0x334155, roughness: 0.7});
+
+  let head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 16), sMat); head.castShadow = true; g.add(head);
+  
+  let exclamationMark = null;
+  if(isHakase) {
+    let hat = createHakaseHat(); hat.position.set(0, 0.25, 0); head.add(hat);
+    exclamationMark = createExclamationMark(); g.add(exclamationMark);
+  }
+
+  let eyeGeo = new THREE.SphereGeometry(0.04, 8, 8);
+  let eyeL = new THREE.Mesh(eyeGeo, new THREE.MeshBasicMaterial({color:0x111111})); let eyeR = eyeL.clone();
+
+  let armL = new THREE.Group(); let armR = new THREE.Group(); let legL = new THREE.Group(); let legR = new THREE.Group();
+  let armLMesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 0.2), pMat); armLMesh.castShadow = true; armL.add(armLMesh);
+  let armRMesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 0.2), pMat); armRMesh.castShadow = true; armR.add(armRMesh);
+  let legLMesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.8, 0.22), pantsMat); legLMesh.castShadow = true; legL.add(legLMesh);
+  let legRMesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.8, 0.22), pantsMat); legRMesh.castShadow = true; legR.add(legRMesh);
+  g.add(armL, armR, legL, legR);
+
+  let body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.4, 0.4), pMat); body.castShadow = true; g.add(body);
+  g.add(eyeL, eyeR); scene.add(g);
+
+  let voicePitch = isHakase ? 0.6 : (0.7 + Math.random() * 0.7);
+  let voiceRate  = 0.8 + Math.random() * 0.4;
+
+  let hInfo = {
+    obj: g, body: body, head: head, eyeL: eyeL, eyeR: eyeR,
+    armL: armL, armR: armR, legL: legL, legR: legR,
+    armLMesh: armLMesh, armRMesh: armRMesh, legLMesh: legLMesh, legRMesh: legRMesh,
+    angle: Math.random() * Math.PI * 2, turnTimer: 100, floorY: y,
+    walk: seated ? false : canWalk, stateTimer: 150 + Math.random() * 200, animOffset: Math.random() * 100,
+    currentSeat: seatRef, bowTimer: 0, isCooldown: false, movingToSeat: false,
+    isHakase: isHakase, exclamationMark: exclamationMark,
+    voicePitch: voicePitch, voiceRate: voiceRate, hakaseState: 'idle',
+    isFixedNpc: !canWalk // 一歩も動かないNPCフラグ
+  };
+
+  if (seated) { setSeatedPose(hInfo); g.position.set(x, y, z); if(seatRef) seatRef.occupied = hInfo; } 
+  else { setStandingPose(hInfo); g.position.set(x, y, z); }
+  humans.push(hInfo);
+  return hInfo;
+}
+
+// 商店街の各店舗前（歩道）に立つクイズNPC（一歩も動かない）
+function createTownQuizNPC(qData) {
+  let h = createHuman(qData.cx, qData.cy, qData.cz, false, null, false); // canWalk = false
+  h.walk = false; 
+  h.obj.position.set(qData.cx, qData.cy, qData.cz);
+  
+  // 道路の中央(X=0)を向く
+  h.angle = qData.cx < 0 ? Math.PI / 2 : -Math.PI / 2;
+  h.obj.rotation.y = h.angle;
+
+  let quizMark = createQuizMark('❓');
+  h.obj.add(quizMark);
+
+  // 第1ステージ中は非表示
+  h.obj.visible = false;
+
+  townQuizNPCs.push({
+    id: qData.id,
+    roomName: qData.roomName,
+    x: qData.cx, z: qData.cz, y: qData.cy,
+    q: qData.q, options: qData.options, a: qData.a,
+    npcInfo: h,
+    quizMark: quizMark
+  });
+}
+
+// サファリパークの8体のクイズ動物生成 (第1ステージから常時表示＆固定配置)
+function createAnimalQuizNPC(qData) {
+  const animalObj = createAnimalMesh(qData.type);
+  animalObj.position.set(qData.cx, qData.cy, qData.cz);
+  
+  // 通路中央(X=0)の方を向く
+  let initialAngle = qData.cx < 0 ? Math.PI / 2 : -Math.PI / 2;
+  animalObj.rotation.y = initialAngle;
+
+  let quizMark = createQuizMark('❓');
+  animalObj.add(quizMark);
+
+  scene.add(animalObj);
+
+  animalQuizNPCs.push({
+    id: qData.id,
+    roomName: qData.roomName,
+    type: qData.type,
+    x: qData.cx, z: qData.cz, y: qData.cy,
+    q: qData.q, options: qData.options, a: qData.a,
+    obj: animalObj,
+    angle: initialAngle,
+    quizMark: quizMark
+  });
+}
+
+function setSeatedPose(h) {
+   h.body.scale.set(1, 0.85, 1); h.body.position.set(0, 1.1, -0.1); h.body.rotation.x = -0.12; 
+   h.head.position.set(0, 1.95, -0.05); h.eyeL.position.set(-0.1, 2.0, 0.28); h.eyeR.position.set(0.1, 2.0, 0.28);
+   h.armL.position.set(-0.5, 1.2, 0.2); h.armL.rotation.set(-Math.PI / 3, 0, 0); h.armLMesh.position.set(0, 0, 0);
+   h.armR.position.set(0.5, 1.2, 0.2);  h.armR.rotation.set(-Math.PI / 3, 0, 0); h.armRMesh.position.set(0, 0, 0);
+   h.legL.position.set(-0.25, 0.5, 0.5); h.legL.rotation.set(-Math.PI / 4, 0, 0); h.legLMesh.position.set(0, 0, 0);
+   h.legR.position.set(0.25, 0.5, 0.5);  h.legR.rotation.set(-Math.PI / 4, 0, 0); h.legRMesh.position.set(0, 0, 0);
+   h.obj.rotation.y = Math.PI; 
+}
+
+function setStandingPose(h) {
+   h.body.scale.set(1, 1, 1); h.body.position.set(0, 1.5, 0); h.body.rotation.x = 0; h.head.rotation.x = 0;
+   h.head.position.set(0, 2.4, 0); h.eyeL.position.set(-0.1, 2.45, 0.33); h.eyeR.position.set(0.1, 2.45, 0.33);
+   h.armL.position.set(-0.52, 2.0, 0); h.armL.rotation.set(0,0,0); h.armLMesh.position.set(0, -0.35, 0);
+   h.armR.position.set(0.52, 2.0, 0); h.armR.rotation.set(0,0,0); h.armRMesh.position.set(0, -0.35, 0);
+   h.legL.position.set(-0.24, 0.8, 0); h.legL.rotation.set(0,0,0); h.legLMesh.position.set(0, -0.4, 0);
+   h.legR.position.set(-0.24, 0.8, 0); h.legR.rotation.set(0,0,0); h.legRMesh.position.set(0, -0.4, 0);
+}
+
+function moveHumans(){
+  let time = Date.now() * 0.008; 
+
+  for(let i = 0; i < humans.length; i++) {
+    let h1 = humans[i]; if(h1.isFixedNpc || !h1.walk || h1.bowTimer > 0 || h1.isCooldown || h1.movingToSeat || h1.hakaseState === 'speaking' || h1.hakaseState === 'waiting_to_leave') continue;
+    for(let j = i + 1; j < humans.length; j++) {
+      let h2 = humans[j]; if(h2.isFixedNpc || !h2.walk || h2.bowTimer > 0 || h2.isCooldown || h2.movingToSeat || h2.hakaseState === 'speaking' || h2.hakaseState === 'waiting_to_leave') continue;
+      if(h1.floorY === h2.floorY && Math.hypot(h1.obj.position.x - h2.obj.position.x, h1.obj.position.z - h2.obj.position.z) < 1.8) {
+        h1.bowTimer = 300; h2.bowTimer = 300; h1.isCooldown = true; h2.isCooldown = true;
+        h1.angle += Math.PI; h2.angle += Math.PI;
+      }
+    }
+  }
+
+  for(let h of humans){
+    if(!h.obj.visible || h.isFixedNpc) continue; // 固定NPCは一切動かない
+
+    if(h.isHakase && (h.hakaseState === 'speaking' || h.hakaseState === 'waiting_to_leave')) {
+      h.legL.rotation.x = 0; h.legR.rotation.x = 0;
+      h.armL.rotation.x = 0; h.armR.rotation.x = 0;
+      if(h.exclamationMark && h.exclamationMark.visible) {
+        h.exclamationMark.quaternion.copy(camera.quaternion);
+      }
+      continue;
+    }
+
+    if(h.bowTimer === 0 && !h.movingToSeat) {
+      h.stateTimer--;
+      if(h.stateTimer <= 0) {
+        h.stateTimer = 200 + Math.random() * 200; 
+        if(Math.random() < 0.45) { 
+          if(!h.walk) { 
+            if(h.currentSeat) { h.currentSeat.occupied = null; h.currentSeat = null; }
+            setStandingPose(h); h.walk = true; h.obj.position.z -= 0.5;
+          } else { 
+            let emptySeats = allSeats.filter(s => !s.occupied && s.y === h.floorY);
+            if(emptySeats.length > 0) {
+              emptySeats.sort((a, b) => Math.hypot(a.x - h.obj.position.x, a.z - h.obj.position.z) - Math.hypot(b.x - h.obj.position.x, b.z - h.obj.position.z));
+              let targetSeat = emptySeats[0];
+              targetSeat.occupied = h; h.currentSeat = targetSeat; h.movingToSeat = true; 
+            }
+          }
+        }
+      }
+    }
+
+    if(h.movingToSeat && h.currentSeat) {
+      let tSeat = h.currentSeat;
+      let dist = Math.hypot(tSeat.x - h.obj.position.x, tSeat.z - h.obj.position.z);
+      if(dist > 0.2) {
+        h.angle = Math.atan2(tSeat.x - h.obj.position.x, tSeat.z - h.obj.position.z);
+        h.obj.rotation.y = h.angle;
+        h.obj.position.x += Math.sin(h.angle) * 0.05; h.obj.position.z += Math.cos(h.angle) * 0.05;
+        let swing = Math.sin(time + h.animOffset) * 0.6;
+        h.legL.rotation.x = swing; h.legR.rotation.x = -swing;
+        h.armL.rotation.x = -swing * 0.9; h.armR.rotation.x = swing * 0.9;
+      } else {
+        setSeatedPose(h); h.obj.position.set(tSeat.x, h.floorY, tSeat.z); h.movingToSeat = false; h.walk = false;
+      }
+      continue;
+    }
+
+    if(!h.walk) continue;
+
+    if(h.bowTimer > 0) {
+      h.bowTimer--;
+      let bowWave = Math.sin(((300 - h.bowTimer) / 300) * Math.PI);
+      h.body.rotation.x = bowWave * 0.45; h.head.rotation.x = bowWave * 0.55;
+      h.legL.rotation.x = 0; h.legR.rotation.x = 0; h.armL.rotation.x = 0; h.armR.rotation.x = 0;
+      if(h.bowTimer === 0) { h.body.rotation.x = 0; h.head.rotation.x = 0; setTimeout(() => { h.isCooldown = false; }, 2000); }
+      continue; 
+    }
+
+    let swing = Math.sin(time + h.animOffset) * 0.6; 
+    h.legL.rotation.x = swing; h.legR.rotation.x = -swing;
+    h.armL.rotation.x = -swing * 0.9; h.armR.rotation.x = swing * 0.9;
+
+    h.turnTimer--;
+    if(h.turnTimer <= 0){ h.angle += (Math.random() - 0.5) * 1.5; h.turnTimer = 80 + Math.random() * 100; }
+    h.obj.rotation.y = h.angle;
+    
+    let speed = 0.035;
+    h.obj.position.x += Math.sin(h.angle) * speed; h.obj.position.z += Math.cos(h.angle) * speed;
+
+    if (h.floorY > 2.0) {
+      const xMin2F = -35, xMax2F = 35;
+      const zMin2F = -30, zMax2F = 20;
+      if (h.obj.position.x < xMin2F) { h.obj.position.x = xMin2F; h.angle += Math.PI; }
+      if (h.obj.position.x > xMax2F) { h.obj.position.x = xMax2F; h.angle += Math.PI; }
+      if (h.obj.position.z < zMin2F) { h.obj.position.z = zMin2F; h.angle += Math.PI; }
+      if (h.obj.position.z > zMax2F) { h.obj.position.z = zMax2F; h.angle += Math.PI; }
+    } else {
+      if (h.obj.position.x < xMin) { h.obj.position.x = xMin; h.angle += Math.PI; }
+      if (h.obj.position.x > xMax) { h.obj.position.x = xMax; h.angle += Math.PI; }
+      if (h.obj.position.z < zMin) { h.obj.position.z = zMin; h.angle += Math.PI; }
+      if (h.obj.position.z > zMax) { h.obj.position.z = zMax; h.angle += Math.PI; }
+    }
+  }
+
+  // 動物たちのゆっくり息づかいアニメーション（位置は変更せず動かない）
+  let breathTime = Date.now() * 0.003;
+  for(let aNpc of animalQuizNPCs) {
+    if(aNpc.obj) {
+      aNpc.obj.position.y = aNpc.y + Math.sin(breathTime + aNpc.id) * 0.08;
+    }
+  }
+}
+
+
+// 教室構築関数
+function classroom(config){
+  let cx = config.cx, cz = config.cz, cy = config.cy;
+  classroomAreas.push({x:cx, z:cz}); 
+
+  let boardMats = createBoardMaterials(config.roomName, config.q);
+  let board = new THREE.Mesh(new THREE.BoxGeometry(8, 3.8, 0.15), boardMats);
+  board.position.set(cx, cy + 2.5, cz - 7.5);
+  board.castShadow = true; board.receiveShadow = true;
+  scene.add(board);
+
+  quizBoards.push({
+    id: config.id, roomName: config.roomName,
+    x: cx, z: cz - 6.5, y: cy,
+    q: config.q, options: config.options, a: config.a
+  });
+
+  let backWall = new THREE.Mesh(new THREE.BoxGeometry(18, 5, 0.3), wallMat);
+  backWall.position.set(cx, cy + 2.5, cz - 8);
+  backWall.receiveShadow = true; scene.add(backWall);
+
+  let sideWallL = new THREE.Mesh(new THREE.BoxGeometry(0.3, 5, 16), wallMat);
+  sideWallL.position.set(cx - 9, cy + 2.5, cz);
+  sideWallL.receiveShadow = true; scene.add(sideWallL);
+
+  let sideWallR = sideWallL.clone(); sideWallR.position.x = cx + 9; scene.add(sideWallR);
+
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 3; c++) {
+      let sx = cx - 4 + c * 4;
+      let sz = cz - 2 + r * 4;
+
+      let deskGroup = new THREE.Group();
+      let top = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.1, 1.0), deskMat);
+      top.position.y = 1.1; top.castShadow = true; top.receiveShadow = true;
+      deskGroup.add(top);
+
+      let legGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.1, 8);
+      let leg1 = new THREE.Mesh(legGeo, pipeMat); leg1.position.set(-0.7, 0.55, -0.4);
+      let leg2 = leg1.clone(); leg2.position.set(0.7, 0.55, -0.4);
+      let leg3 = leg1.clone(); leg3.position.set(-0.7, 0.55, 0.4);
+      let leg4 = leg1.clone(); leg4.position.set(0.7, 0.55, 0.4);
+      deskGroup.add(leg1, leg2, leg3, leg4);
+
+      let chair = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.08, 0.8), deskMat);
+      chair.position.set(0, 0.6, 0.8); chair.castShadow = true;
+      deskGroup.add(chair);
+
+      deskGroup.position.set(sx, cy, sz);
+      scene.add(deskGroup);
+
+      let seatObj = { x: sx, y: cy, z: sz + 0.8, occupied: null };
+      allSeats.push(seatObj);
+
+      if (Math.random() < 0.6) {
+        createHuman(sx, cy, sz + 0.8, true, seatObj);
+      }
+    }
+  }
+}
+
+// 8つの教室を配置（ステージ1）
+stage1QuizData.forEach(q => classroom(q));
+
+// 商店街の8つのお店の前(歩道)に一歩も動かないクイズNPCを配置（ステージ2）
+stage2QuizData.forEach(q => createTownQuizNPC(q));
+
+// アニマルパークの8体の動かない動物NPCを配置（ステージ3：第1ステージから常時表示）
+stage3QuizData.forEach(q => createAnimalQuizNPC(q));
+
+// 校舎内の歩行者NPC生成
+for (let i = 0; i < 10; i++) {
+  let is2F = Math.random() < 0.5;
+  let hy = is2F ? 5.5 : 0;
+  let hx = (Math.random() - 0.5) * 50;
+  let hz = (Math.random() - 0.5) * 30;
+  createHuman(hx, hy, hz, false);
+}
+
+
+// --- 8. 接触・近接インタラクション判定 ---
+let quizAnsweredCooldown = null;
+let activeHakase = null;
+
+function checkProximity() {
+  let pPos = playerPos;
+
+  if (currentStage === 1) {
+    // Stage 1: 教室の黒板クイズ判定
+    let nearAnyBoard = false;
+    for(let b of quizBoards) {
+      let dist = Math.hypot(pPos.x - b.x, pPos.z - b.z);
+      let heightDiff = Math.abs(pPos.y - (b.y + 1.7));
+
+      if(dist < 2.8 && heightDiff < 2.0) { 
+        nearAnyBoard = true;
+        if(activeQuiz !== b && quizAnsweredCooldown !== b) {
+          activeQuiz = b;
+          showQuizUI(b);
+        }
+        break;
+      }
+    }
+    if(!nearAnyBoard) {
+      if(activeQuiz !== null) hideQuizUI();
+      activeQuiz = null;
+      quizAnsweredCooldown = null;
+    }
+  } else if (currentStage === 2) {
+    // Stage 2: 歩道に立っている町の人（商店街NPC）との会話クイズ判定
+    let nearAnyTownNPC = false;
+    for(let tNpc of townQuizNPCs) {
+      let dist = Math.hypot(pPos.x - tNpc.x, pPos.z - tNpc.z);
+      let heightDiff = Math.abs(pPos.y - (tNpc.y + 1.7));
+
+      if(dist < 2.5 && heightDiff < 1.8) { 
+        nearAnyTownNPC = true;
+        if(activeQuiz !== tNpc && quizAnsweredCooldown !== tNpc) {
+          activeQuiz = tNpc;
+          // NPCがプレイヤーの方に向き直る（移動は一切しない）
+          tNpc.npcInfo.angle = Math.atan2(pPos.x - tNpc.x, pPos.z - tNpc.z);
+          tNpc.npcInfo.obj.rotation.y = tNpc.npcInfo.angle;
+          showQuizUI(tNpc);
+        }
+        break;
+      }
+    }
+    if(!nearAnyTownNPC) {
+      if(activeQuiz !== null) hideQuizUI();
+      activeQuiz = null;
+      quizAnsweredCooldown = null;
+    }
+  } else if (currentStage === 3) {
+    // Stage 3: アニマルパークに配置された8体の動物クイズ判定
+    let nearAnyAnimal = false;
+    for(let aNpc of animalQuizNPCs) {
+      let dist = Math.hypot(pPos.x - aNpc.x, pPos.z - aNpc.z);
+      let heightDiff = Math.abs(pPos.y - (aNpc.y + 1.7));
+
+      if(dist < 3.2 && heightDiff < 2.0) {
+        nearAnyAnimal = true;
+        if(activeQuiz !== aNpc && quizAnsweredCooldown !== aNpc) {
+          activeQuiz = aNpc;
+          // 動物がプレイヤーの方を向く（移動は一切しない）
+          aNpc.angle = Math.atan2(pPos.x - aNpc.x, pPos.z - aNpc.z);
+          aNpc.obj.rotation.y = aNpc.angle;
+          showQuizUI(aNpc);
+        }
+        break;
+      }
+    }
+    if(!nearAnyAnimal) {
+      if(activeQuiz !== null) hideQuizUI();
+      activeQuiz = null;
+      quizAnsweredCooldown = null;
+    }
+  }
+
+  // 博士の雑学判定
+  for(let h of humans) {
+    if(!h.obj.visible || !h.isHakase || h.hakaseState === 'leaving' || h.hakaseState === 'waiting_to_leave') continue;
+    let dist = Math.hypot(pPos.x - h.obj.position.x, pPos.z - h.obj.position.z);
+    let heightDiff = Math.abs(pPos.y - (h.floorY + 1.7));
+
+    if(dist < 2.5 && heightDiff < 1.5) {
+      if(activeHakase !== h) {
+        activeHakase = h;
+        triggerHakaseSequence(h);
+      }
+      break;
+    }
+  }
+}
+
+function showQuizUI(board) {
+  const overlay = document.getElementById('quiz-overlay');
+  if (currentStage === 3) {
+    document.getElementById('quiz-room-title').innerText = `💬 ${board.roomName} からの歴史問題`;
+  } else if (currentStage === 2) {
+    document.getElementById('quiz-room-title').innerText = `💬 ${board.roomName} からの歴史クイズ`;
+  } else {
+    document.getElementById('quiz-room-title').innerText = `【 ${board.roomName} 】`;
+  }
+  document.getElementById('quiz-question').innerText = board.q;
+
+  const optsContainer = document.getElementById('quiz-options');
+  optsContainer.innerHTML = "";
+
+  board.options.forEach((optText, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'quiz-opt-btn';
+    btn.innerText = `${idx + 1}. ${optText}`;
+    btn.onclick = () => handleChoiceSelect(idx);
+    optsContainer.appendChild(btn);
+  });
+
+  overlay.style.display = 'block';
+}
+
+function hideQuizUI() {
+  document.getElementById('quiz-overlay').style.display = 'none';
+}
+
+function handleChoiceSelect(chosenIndex) {
+  if(!activeQuiz) return;
+
+  const resDisplay = document.getElementById('result-display');
+  const board = activeQuiz;
+
+  if(chosenIndex === board.a) {
+    resDisplay.innerText = "〇";
+    resDisplay.className = "correct";
+    playCorrectSound();
+    
+    let currentStampsArr = currentStage === 1 ? stage1Stamps : (currentStage === 2 ? stage2Stamps : stage3Stamps);
+
+    if(!currentStampsArr[board.id]) {
+      currentStampsArr[board.id] = true;
+      updateStampCardUI();
+      
+      setTimeout(() => { openStampModal(board.id); }, 700);
+    }
+  } else {
+    resDisplay.innerText = "×";
+    resDisplay.className = "incorrect";
+    playIncorrectSound();
+  }
+
+  resDisplay.style.display = 'block';
+  hideQuizUI();
+  quizAnsweredCooldown = board;
+  activeQuiz = null;
+
+  setTimeout(() => { resDisplay.style.display = 'none'; }, 1200);
+}
+
+function initStampGrid() {
+  const container = document.getElementById('stamp-grid-container');
+  container.innerHTML = "";
+
+  const dataArr = currentStage === 1 ? stage1QuizData : (currentStage === 2 ? stage2QuizData : stage3QuizData);
+
+  dataArr.forEach((q, idx) => {
+    const slot = document.createElement('div');
+    slot.className = 'stamp-slot';
+    slot.id = `stamp-slot-${idx}`;
+    slot.innerHTML = `
+      <span>第${idx + 1}問</span>
+      <div class="stamp-mark" id="stamp-mark-${idx}">💮</div>
+    `;
+    container.appendChild(slot);
+  });
+}
+
+function updateStampCardUI() {
+  const currentStampsArr = currentStage === 1 ? stage1Stamps : (currentStage === 2 ? stage2Stamps : stage3Stamps);
+  const count = currentStampsArr.filter(Boolean).length;
+  
+  document.getElementById('stamp-count-hud').innerText = count;
+  document.getElementById('modal-stamp-count').innerText = count;
+
+  currentStampsArr.forEach((isCleared, idx) => {
+    const mark = document.getElementById(`stamp-mark-${idx}`);
+    if(mark) {
+      if(isCleared) mark.classList.add('stamped');
+      else mark.classList.remove('stamped');
+    }
+  });
+
+  if(count === 8) {
+    if(currentStage === 1) {
+      setTimeout(() => { triggerStage1Clear(); }, 1500);
+    } else if(currentStage === 2) {
+      setTimeout(() => { triggerStage2Clear(); }, 1500);
+    } else {
+      setTimeout(() => { triggerGameClear(); }, 1500);
+    }
+  }
+}
+
+function openStampModal(highlightId = null) {
+  initStampGrid();
+  updateStampCardUI();
+
+  if (currentStage === 1) {
+    document.getElementById('modal-title').innerText = "💮 花丸スタンプカード（学校）";
+    document.getElementById('modal-sub').innerText = "8つの教室歴史クイズに答えてスタンプを集めよう！";
+  } else if (currentStage === 2) {
+    document.getElementById('modal-title').innerText = "💮 花丸スタンプカード（商店街）";
+    document.getElementById('modal-sub').innerText = "商店街の町の人々の歴史クイズに答えてスタンプを集めよう！";
+  } else {
+    document.getElementById('modal-title').innerText = "💮 花丸スタンプカード（アニマルパーク）";
+    document.getElementById('modal-sub').innerText = "8体の動物たちの歴史問題に答えてスタンプを集めよう！";
+  }
+
+  const modal = document.getElementById('stamp-modal');
+  modal.style.display = 'block';
+
+  if(highlightId !== null) {
+    const mark = document.getElementById(`stamp-mark-${highlightId}`);
+    if(mark) {
+      mark.classList.remove('stamped');
+      setTimeout(() => { mark.classList.add('stamped'); }, 200);
+    }
+  }
+}
+
+function closeStampModal() {
+  document.getElementById('stamp-modal').style.display = 'none';
+}
+
+let nextStageCallback = null;
+
+function triggerStage1Clear() {
+  closeStampModal();
+  hideQuizUI();
+  playClearFanfare();
+
+  document.getElementById('stage-clear-icon').innerText = "🏫💮🎉";
+  document.getElementById('stage-clear-title').innerText = "ステージ1クリア！";
+  document.getElementById('stage-clear-desc').innerHTML = "学校の歴史クイズ8問を全問制覇しました！<br>次は<b>「第2ステージ：商店街編」</b>に挑戦しよう！";
+  document.getElementById('stage-clear-btn').innerText = "商店街（ステージ2）へ進む！ 🏘️";
+  nextStageCallback = startStage2;
+
+  document.getElementById('stage-clear-modal').style.display = 'block';
+  speakText("おめでとうございます！学校の歴史クイズをすべてクリアしました！第2ステージ、商店街へ進みましょう！", 1.1, 1.0);
+}
+
+function triggerStage2Clear() {
+  closeStampModal();
+  hideQuizUI();
+  playClearFanfare();
+
+  document.getElementById('stage-clear-icon').innerText = "🏘️💮🎉";
+  document.getElementById('stage-clear-title').innerText = "ステージ2クリア！";
+  document.getElementById('stage-clear-desc').innerHTML = "商店街の歴史クイズ8問を全問制覇しました！<br>次はいよいよ最終エリア<b>「第3ステージ：サファリ・アニマルパーク編」</b>に挑戦しよう！";
+  document.getElementById('stage-clear-btn').innerText = "アニマルパーク（ステージ3）へ進む！ 🦁";
+  nextStageCallback = startStage3;
+
+  document.getElementById('stage-clear-modal').style.display = 'block';
+  speakText("おめでとうございます！商店街の歴史クイズをクリアしました！新エリア、第3ステージのサファリアニマルパークへ進みましょう！", 1.1, 1.0);
+}
+
+function nextStageAction() {
+  if (nextStageCallback) nextStageCallback();
+}
+
+function startStage2() {
+  document.getElementById('stage-clear-modal').style.display = 'none';
+  currentStage = 2;
+
+  playerPos.set(0, 1.7, 32);
+  targetYaw = Math.PI; 
+  currentYaw = Math.PI;
+
+  // UI更新
+  document.getElementById('info-title-stage').innerText = "ステージ2：商店街編";
+  document.getElementById('info-badge').innerText = "STAGE 2";
+  document.getElementById('info-desc').innerText = "歩道に立つ町の人々に話しかけて歴史クイズに答えよう！";
+  document.getElementById('info-sub').innerText = "💮 商店街スタンプ 8個を集めよう！";
+  
+  // 商店街のクイズNPCを表示＆活性化
+  townQuizNPCs.forEach(tNpc => {
+    tNpc.npcInfo.obj.visible = true;
+  });
+
+  initStampGrid();
+  updateStampCardUI();
+
+  speakText("第2ステージスタート！商店街の歩道に立つ町の人たちに話しかけて江戸時代までの歴史クイズを解こう！", 1.1, 1.0);
+}
+
+function startStage3() {
+  document.getElementById('stage-clear-modal').style.display = 'none';
+  currentStage = 3;
+
+  playerPos.set(0, 1.7, 145);
+  targetYaw = Math.PI;
+  currentYaw = Math.PI;
+
+  // UI更新
+  document.getElementById('info-title-stage').innerText = "ステージ3：サファリ・アニマルパーク編";
+  document.getElementById('info-badge').innerText = "STAGE 3";
+  document.getElementById('info-desc').innerText = "パークに配置された8体の動物たちに近づいて歴史クイズに答えよう！";
+  document.getElementById('info-sub').innerText = "💮 動物スタンプ 8個を集めよう！";
+
+  initStampGrid();
+  updateStampCardUI();
+
+  speakText("最終エリア第3ステージスタート！アニマルパークの動物たちに話しかけて歴史クイズ全制覇を目指そう！", 1.1, 1.0);
+}
+
+function triggerGameClear() {
+  closeStampModal();
+  hideQuizUI();
+  playClearFanfare();
+  document.getElementById('clear-overlay').style.display = 'flex';
+  speakText("全ステージ制覇おめでとうございます！学校、商店街、アニマルパークすべての歴史クイズ全24問をクリアしました！", 1.1, 1.0);
+}
+
+function triggerHakaseSequence(h) {
+  h.hakaseState = 'speaking';
+  if(!h.walk) {
+    if(h.currentSeat) { h.currentSeat.occupied = null; h.currentSeat = null; }
+    setStandingPose(h); h.walk = true;
+  }
+
+  h.angle = Math.atan2(playerPos.x - h.obj.position.x, playerPos.z - h.obj.position.z);
+  h.obj.rotation.y = h.angle;
+
+  if(h.exclamationMark) h.exclamationMark.visible = true;
+  playExclamationSound();
+
+  const trivia = triviaList[Math.floor(Math.random() * triviaList.length)];
+  document.getElementById('hakase-text').innerText = trivia;
+  document.getElementById('hakase-overlay').style.display = 'block';
+
+  speakText(trivia, h.voicePitch, h.voiceRate);
+}
+
+function closeHakaseUI() {
+  document.getElementById('hakase-overlay').style.display = 'none';
+  if('speechSynthesis' in window) window.speechSynthesis.cancel();
+  
+  if(activeHakase) {
+    let h = activeHakase;
+    if(h.exclamationMark) h.exclamationMark.visible = false;
+    h.hakaseState = 'waiting_to_leave';
+
+    setTimeout(() => {
+      h.hakaseState = 'leaving';
+      h.angle += Math.PI + (Math.random() - 0.5);
+      h.obj.rotation.y = h.angle;
+      activeHakase = null;
+    }, 3000);
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  if(e.key === 'Escape') {
+    closeHakaseUI();
+    closeStampModal();
+  }
+});
+
+
+// --- 9. 移動・視点コントロール処理 ---
+const moveState = { forward: false, backward: false, left: false, right: false };
+
+document.addEventListener('keydown', (e) => {
+  if (e.repeat) return;
+  if (e.code === 'KeyW' || e.code === 'ArrowUp') moveState.forward = true;
+  if (e.code === 'KeyS' || e.code === 'ArrowDown') moveState.backward = true;
+  if (e.code === 'KeyA' || e.code === 'ArrowLeft') moveState.left = true;
+  if (e.code === 'KeyD' || e.code === 'ArrowRight') moveState.right = true;
+});
+
+document.addEventListener('keyup', (e) => {
+  if (e.code === 'KeyW' || e.code === 'ArrowUp') moveState.forward = false;
+  if (e.code === 'KeyS' || e.code === 'ArrowDown') moveState.backward = false;
+  if (e.code === 'KeyA' || e.code === 'ArrowLeft') moveState.left = false;
+  if (e.code === 'KeyD' || e.code === 'ArrowRight') moveState.right = false;
+});
+
+function bindDpadBtn(elementId, keyProp) {
+  const btn = document.getElementById(elementId);
+  if (!btn) return;
+  const start = (e) => {
+    e.preventDefault();
+    moveState[keyProp] = true;
+    btn.classList.add('active');
+  };
+  const end = (e) => {
+    e.preventDefault();
+    moveState[keyProp] = false;
+    btn.classList.remove('active');
+  };
+  btn.addEventListener('touchstart', start, {passive: false});
+  btn.addEventListener('touchend', end, {passive: false});
+  btn.addEventListener('touchcancel', end, {passive: false});
+  btn.addEventListener('mousedown', start);
+  btn.addEventListener('mouseup', end);
+  btn.addEventListener('mouseleave', end);
+}
+
+bindDpadBtn('dpad-up', 'forward');
+bindDpadBtn('dpad-down', 'backward');
+bindDpadBtn('dpad-left', 'left');
+bindDpadBtn('dpad-right', 'right');
+
+let isDragging = false;
+let lastPointerX = 0;
+
+window.addEventListener('mousedown', (e) => {
+  if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT' && !e.target.classList.contains('dpad-btn')) {
+    isDragging = true;
+    lastPointerX = e.clientX;
+  }
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (isDragging) {
+    let deltaX = e.clientX - lastPointerX;
+    targetYaw += deltaX * 0.005;
+    lastPointerX = e.clientX;
+  }
+});
+
+window.addEventListener('mouseup', () => { isDragging = false; });
+
+window.addEventListener('touchstart', (e) => {
+  if (e.touches.length > 0 && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT' && !e.target.classList.contains('dpad-btn')) {
+    isDragging = true;
+    lastPointerX = e.touches[0].clientX;
+  }
+}, {passive: true});
+
+window.addEventListener('touchmove', (e) => {
+  if (isDragging && e.touches.length > 0) {
+    let deltaX = e.touches[0].clientX - lastPointerX;
+    targetYaw += deltaX * 0.005;
+    lastPointerX = e.touches[0].clientX;
+  }
+}, {passive: true});
+
+window.addEventListener('touchend', () => { isDragging = false; });
+
+function showInitialGuidance() {
+  const msg = "ようこそ！まずは第1ステージの学校で、8つの教室にある歴史クイズに挑戦しよう！";
+  speakText(msg, 1.1, 1.0);
+}
+
+function closeGuidanceUI() {
+  document.getElementById('guidance-overlay').style.display = 'none';
+  if('speechSynthesis' in window) window.speechSynthesis.cancel();
+  initAudio();
+}
+
+window.addEventListener('load', () => {
+  initStampGrid();
+  setTimeout(() => { showInitialGuidance(); }, 500);
+});
+
+let currentFloor = 1;
+
+function updatePlayerMovement() {
+  let diff = targetYaw - currentYaw;
+  if (Math.abs(diff) > 0.0001) {
+    currentYaw += diff * 0.18;
+  } else {
+    currentYaw = targetYaw;
+  }
+
+  camera.rotation.y = currentYaw;
+  camera.rotation.x = 0;
+  camera.rotation.z = 0;
+
+  const speed = 0.22;
+  
+  if (moveState.forward) {
+    playerPos.x -= Math.sin(targetYaw) * speed;
+    playerPos.z -= Math.cos(targetYaw) * speed;
+  }
+  if (moveState.backward) {
+    playerPos.x += Math.sin(targetYaw) * speed;
+    playerPos.z += Math.cos(targetYaw) * speed;
+  }
+  if (moveState.left) {
+    playerPos.x -= Math.cos(targetYaw) * speed;
+    playerPos.z += Math.sin(targetYaw) * speed;
+  }
+  if (moveState.right) {
+    playerPos.x += Math.cos(targetYaw) * speed;
+    playerPos.z -= Math.sin(targetYaw) * speed;
+  }
+
+  // 校舎内の階段・階層判定
+  if (playerPos.z <= 30) {
+    const inStairArea = Math.abs(playerPos.x) < 2.5 && playerPos.z <= 4.0 && playerPos.z >= -8.0;
+
+    if (inStairArea) {
+      let stairRatio = (4.0 - playerPos.z) / 12.0;
+      stairRatio = Math.max(0, Math.min(1, stairRatio));
+      playerPos.y = 1.7 + stairRatio * 5.5;
+
+      if (playerPos.z <= -7.5) currentFloor = 2;
+      else if (playerPos.z >= 3.5) currentFloor = 1;
+    } else {
+      if (currentFloor === 2) playerPos.y = 7.2;
+      else playerPos.y = 1.7;
+    }
+  } else {
+    currentFloor = 1;
+    playerPos.y = 1.7;
+  }
+
+  playerPos.x = Math.max(xMin, Math.min(xMax, playerPos.x));
+  playerPos.z = Math.max(zMin, Math.min(zMax, playerPos.z));
+
+  camera.position.copy(playerPos);
+}
+
+
+// --- 10. ミニマップ描画 ---
+const mapCanvas = document.getElementById('map');
+const mapCtx = mapCanvas.getContext('2d');
+mapCanvas.width = 150; mapCanvas.height = 150;
+
+function drawMinimap() {
+  mapCtx.fillStyle = '#0f172a';
+  mapCtx.fillRect(0, 0, 150, 150);
+
+  const worldToMap = (wx, wz) => {
+    return {
+      x: 75 + wx * 1.1,
+      y: 20 + wz * 0.48
+    };
+  };
+
+  // 道路・学校・パークエリアライン描画
+  mapCtx.fillStyle = '#334155';
+  let roadTopLeft = worldToMap(-12, 35);
+  mapCtx.fillRect(roadTopLeft.x, roadTopLeft.y, 26, 50);
+
+  // パークエリア
+  mapCtx.fillStyle = '#15803d';
+  let parkTopLeft = worldToMap(-30, 145);
+  mapCtx.fillRect(parkTopLeft.x, parkTopLeft.y, 66, 50);
+
+  if (currentStage === 1) {
+    for (let b of quizBoards) {
+      let m = worldToMap(b.x, b.z);
+      mapCtx.fillStyle = stage1Stamps[b.id] ? '#ef4444' : '#22c55e';
+      mapCtx.fillRect(m.x - 3, m.y - 3, 6, 6);
+    }
+  } else if (currentStage === 2) {
+    for (let t of townQuizNPCs) {
+      let m = worldToMap(t.x, t.z);
+      mapCtx.fillStyle = stage2Stamps[t.id] ? '#ef4444' : '#38bdf8';
+      mapCtx.beginPath(); mapCtx.arc(m.x, m.y, 3, 0, Math.PI*2); mapCtx.fill();
+    }
+  } else if (currentStage === 3) {
+    for (let a of animalQuizNPCs) {
+      let m = worldToMap(a.x, a.z);
+      mapCtx.fillStyle = stage3Stamps[a.id] ? '#ef4444' : '#f59e0b';
+      mapCtx.beginPath(); mapCtx.arc(m.x, m.y, 4, 0, Math.PI*2); mapCtx.fill();
+    }
+  }
+
+  // プレイヤーマーク
+  let pMap = worldToMap(playerPos.x, playerPos.z);
+  mapCtx.fillStyle = '#f59e0b';
+  mapCtx.beginPath(); mapCtx.arc(pMap.x, pMap.y, 4, 0, Math.PI * 2); mapCtx.fill();
+
+  // 視点方向ライン
+  mapCtx.strokeStyle = '#fef08a';
+  mapCtx.lineWidth = 2;
+  mapCtx.beginPath();
+  mapCtx.moveTo(pMap.x, pMap.y);
+  mapCtx.lineTo(pMap.x - Math.sin(targetYaw) * 10, pMap.y - Math.cos(targetYaw) * 10);
+  mapCtx.stroke();
+}
+
+
+// --- 11. メインループ ---
+function animate() {
+  requestAnimationFrame(animate);
+
+  updatePlayerMovement();
+  moveHumans();
+  checkProximity();
+  drawMinimap();
+
+  renderer.render(scene, camera);
+}
+
+// リサイズ対応
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// アニメーションループ起動
+window.onload = function() {
+  animate();
+};
+
+</script>
+</body>
+</html>
